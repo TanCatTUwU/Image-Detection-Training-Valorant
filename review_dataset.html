@@ -34,19 +34,20 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid #4b5564;border-
 .review-view-tools{display:flex;align-items:center;gap:9px;margin:0 0 12px;font-size:12px}.review-view-tools label{color:var(--muted)}.review-view-tools .nav{margin-left:auto}.grid-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.grid-cards.nine{grid-template-columns:repeat(3,minmax(0,1fr))}.grid-card{padding:0;overflow:hidden;text-align:left;background:var(--panel);border-color:var(--line);min-width:0}.grid-card:hover{border-color:#8291a5}.grid-picture{position:relative;aspect-ratio:640/448;background:#090c10;overflow:hidden}.grid-picture img,.grid-picture svg{position:absolute;inset:0;width:100%;height:100%;display:block}.grid-picture svg{pointer-events:none}.grid-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted);padding:12px}.grid-card[data-loaded="true"] .grid-loading{display:none}.grid-card[data-error="true"] .grid-loading{color:#f0aaa2}.grid-caption{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;font-size:11px}.grid-caption strong{font-weight:500;overflow:hidden;text-overflow:ellipsis}.grid-caption .pill{white-space:nowrap;font-size:10px}.grid-card.auto_removed .grid-picture{opacity:.65}
 @media(max-width:760px){.counts{grid-template-columns:repeat(4,1fr)}.empty-scan-controls{margin-bottom:0;padding-bottom:0;border-bottom:0}#startEmptyScan{width:auto}.grid-cards,.grid-cards.nine{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.grid-caption{align-items:flex-start;flex-direction:column;gap:4px;padding:7px}.review-view-tools{flex-wrap:wrap}.review-view-tools .nav{font-size:11px;gap:5px}}
 .grid-picture img{object-fit:contain}@media(min-width:761px){.grid-picture{height:var(--grid-preview-height,auto);aspect-ratio:auto}}
+.review-controls{margin-bottom:12px}.review-controls .view-tools{border-bottom:0}.view-tools .nav{margin-left:auto;white-space:nowrap}.canvas-top label{font-size:12px;color:var(--muted)}.canvas-top select{padding:4px 7px}#rejectAutoRemoved{margin:0 0 12px;text-align:left}
 </style>
 </head>
 <body>
 <header><div class="brand">Dataset review <span>Head / Body</span></div><div class="local">Local <button id="reload" class="small">Reload</button></div></header>
 <div class="layout">
-<aside id="reviewSidebar" aria-label="Review navigation"><nav class="sidebar-nav" role="tablist" aria-label="Sidebar sections"><button id="framesTab" type="button" role="tab" aria-controls="framesPanel" aria-selected="true" class="active">Frames</button><button id="recordingsTab" type="button" role="tab" aria-controls="recordingsPanel" aria-selected="false" tabindex="-1">Recordings</button></nav><section id="framesPanel" class="sidebar-panel" role="tabpanel" aria-labelledby="framesTab"><h2>Review progress</h2><div id="source" class="source muted">Loading recording…</div><div class="progress"><div id="progressBar"></div></div><div id="progressText" class="muted" style="font-size:11px">—</div><div class="counts"><div><strong id="pendingCount">0</strong><span>Pending</span></div><div><strong id="approvedCount">0</strong><span>Approved</span></div><div><strong id="rejectedCount">0</strong><span>Rejected</span></div><div><strong id="autoRemovedCount">0</strong><span>Auto removed</span></div></div><label for="filter" class="muted" style="font-size:11px">Frames</label><select id="filter" class="filter"><option value="pending">Pending</option><option value="all">All frames</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="auto_removed">Auto removed</option></select><section class="empty-scan-controls" aria-label="Empty frame scan"><button id="startEmptyScan" class="small" disabled title="Checks untouched, unboxed pending frames with the selected model family. Removed frames remain recoverable.">Scan empty frames</button><div id="emptyScanStatus" hidden><div class="scan-heading"><strong id="emptyScanTitle">Empty scan</strong><button id="cancelEmptyScan" class="small" hidden>Cancel</button></div><p id="emptyScanMessage"></p><div class="progress"><div id="emptyScanProgress"></div></div><div id="emptyScanCounts"></div><div id="emptyScanModel"></div></div><p id="emptyScanError" class="workbench-error" role="status" hidden></p></section><div id="frameList" class="frame-list"></div></section><section id="recordingsPanel" class="sidebar-panel" role="tabpanel" aria-labelledby="recordingsTab" hidden><div class="recordings-scroll"><p id="recordingUnavailable" class="help">Loading recordings…</p><section id="recordingBar" class="recording-bar" aria-label="Local recordings" hidden><label for="recordingSelect">Recording</label><select id="recordingSelect" size="9" disabled aria-label="Recordings"><option value="">Current recording</option></select><p id="recordingStatus" class="help">Loading recordings…</p><div id="recordingError" class="workbench-error" role="status" hidden></div></section><section id="preparationStatus" class="job-card" aria-label="Video preparation progress" hidden><div class="job-title"><strong id="preparationTitle">Preparing frames</strong><button id="openPreparedRecording" class="small" hidden>Open recording</button></div><p id="preparationMessage"></p><div class="progress"><div id="preparationProgress"></div></div><div id="preparationCounts" class="model-detail"></div><details><summary class="help">Details and log</summary><div id="preparationPath" class="model-detail"></div><pre id="preparationLog" class="job-log"></pre></details></section></div><div class="recording-footer"><button id="browseVideo" class="small" disabled>Browse video…</button><button id="openPreparation" class="small" disabled>Prepare frames…</button></div></section></aside>
-<main><div id="running" class="running" hidden>Preparing frames. Open this recording again when it finishes.</div><div class="heading"><div><h1 id="frameTitle">Loading frames</h1><div id="meta" class="meta"></div></div><div id="frameNavigation" class="nav"><span id="position" class="muted" style="font-size:12px"></span><button id="previous" title="Previous frame [←]" aria-label="Previous frame">←</button><button id="next" title="Next frame [→]" aria-label="Next frame">→</button></div></div>
+<aside id="reviewSidebar" aria-label="Review navigation"><nav class="sidebar-nav" role="tablist" aria-label="Sidebar sections"><button id="framesTab" type="button" role="tab" aria-controls="framesPanel" aria-selected="true" class="active">Frames</button><button id="recordingsTab" type="button" role="tab" aria-controls="recordingsPanel" aria-selected="false" tabindex="-1">Recordings</button></nav><section id="framesPanel" class="sidebar-panel" role="tabpanel" aria-labelledby="framesTab"><h2>Review progress</h2><div id="source" class="source muted">Loading recording…</div><div class="progress"><div id="progressBar"></div></div><div id="progressText" class="muted" style="font-size:11px">—</div><div class="counts"><div><strong id="pendingCount">0</strong><span>Pending</span></div><div><strong id="approvedCount">0</strong><span>Approved</span></div><div><strong id="rejectedCount">0</strong><span>Rejected</span></div><div><strong id="autoRemovedCount">0</strong><span>Auto removed</span></div></div><label for="filter" class="muted" style="font-size:11px">Frames</label><select id="filter" class="filter"><option value="pending">Pending</option><option value="all">All frames</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="auto_removed">Auto removed</option></select><button id="rejectAutoRemoved" class="small danger" hidden>Reject all auto removed</button><section class="empty-scan-controls" aria-label="Empty frame scan"><button id="startEmptyScan" class="small" disabled title="Checks untouched, unboxed pending frames with the selected model family. Removed frames remain recoverable.">Scan empty frames</button><div id="emptyScanStatus" hidden><div class="scan-heading"><strong id="emptyScanTitle">Empty scan</strong><button id="cancelEmptyScan" class="small" hidden>Cancel</button></div><p id="emptyScanMessage"></p><div class="progress"><div id="emptyScanProgress"></div></div><div id="emptyScanCounts"></div><div id="emptyScanModel"></div></div><p id="emptyScanError" class="workbench-error" role="status" hidden></p></section><div id="frameList" class="frame-list"></div></section><section id="recordingsPanel" class="sidebar-panel" role="tabpanel" aria-labelledby="recordingsTab" hidden><div class="recordings-scroll"><p id="recordingUnavailable" class="help">Loading recordings…</p><section id="recordingBar" class="recording-bar" aria-label="Local recordings" hidden><label for="recordingSelect">Recording</label><select id="recordingSelect" size="9" disabled aria-label="Recordings"><option value="">Current recording</option></select><p id="recordingStatus" class="help">Loading recordings…</p><div id="recordingError" class="workbench-error" role="status" hidden></div></section><section id="preparationStatus" class="job-card" aria-label="Video preparation progress" hidden><div class="job-title"><strong id="preparationTitle">Preparing frames</strong><button id="openPreparedRecording" class="small" hidden>Open recording</button></div><p id="preparationMessage"></p><div class="progress"><div id="preparationProgress"></div></div><div id="preparationCounts" class="model-detail"></div><details><summary class="help">Details and log</summary><div id="preparationPath" class="model-detail"></div><pre id="preparationLog" class="job-log"></pre></details></section></div><div class="recording-footer"><button id="browseVideo" class="small" disabled>Browse video…</button><button id="openPreparation" class="small" disabled>Prepare frames…</button></div></section></aside>
+<main><div id="running" class="running" hidden>Preparing frames. Open this recording again when it finishes.</div><div class="heading"><div><h1 id="frameTitle">Loading frames</h1><div id="meta" class="meta"></div></div></div>
 <section id="modelBar" class="model-bar" aria-label="Models and training"><div class="model-label"><label for="modelSelect">Model</label><select id="modelSelect" disabled><option value="">Loading models…</option></select><span id="activeModelBadge" class="pill" hidden>Default</span></div><button id="useModel" class="small" disabled>Use as default</button><button id="downloadOnnx" class="small" disabled>Download .onnx</button><button id="downloadPt" class="small" disabled>Download .pt</button><button id="openTraining" class="small training-open" disabled>Train…</button><p id="workbenchStatus" class="help">Loading models…</p><div id="workbenchError" class="workbench-error" role="status" hidden></div></section>
 <section id="trainingStatus" class="job-card" aria-label="Training progress" hidden><div class="job-title"><strong id="jobTitle">Training</strong><button id="viewTraining" class="small">View options</button></div><p id="jobMessage"></p><div class="progress"><div id="jobProgress"></div></div><details><summary class="help">Details and log</summary><div id="jobPath" class="model-detail"></div><pre id="jobLog" class="job-log"></pre></details><div id="trainingDownloads" class="actions-group" hidden><button id="downloadTrainedOnnx" class="small">Download .onnx</button><button id="downloadTrainedPt" class="small">Download .pt</button></div></section>
-<div class="review-view-tools"><label for="gridSize">View</label><select id="gridSize" aria-label="Frames per view"><option value="1">1 frame</option><option value="4">4 frames</option><option value="9">9 frames</option></select><div id="gridNavigation" class="nav" hidden><span id="gridPosition" class="muted"></span><button id="gridPrevious" aria-label="Previous grid page">←</button><button id="gridNext" aria-label="Next grid page">→</button></div></div><section id="gridView" aria-label="Frame contact sheet" hidden><div id="gridCards" class="grid-cards"></div></section><div id="editor" class="workspace"><section class="canvas-card"><div class="canvas-top"><button id="selectTool" class="active" title="Select, move, resize [V]">Select <kbd>V</kbd></button><button id="drawTool" title="Draw rectangle [D]">Draw <kbd>D</kbd></button><span class="divider"></span><button id="labelsToggle" aria-pressed="false" title="Show class names over the crop">Labels off</button><button id="undo" title="Undo [Ctrl+Z]">Undo</button><button id="delete" title="Delete selected box [Delete]">Delete</button><span id="dirty" class="dirty" hidden>Unsaved</span></div><div class="view-tools" aria-label="Image view controls"><button id="zoomOut" aria-label="Zoom out">−</button><output id="zoomLevel" aria-live="polite" aria-label="Image zoom">100%</output><button id="zoomIn" aria-label="Zoom in">+</button><button id="zoomReset" title="Fit the complete image">Fit</button><span class="divider"></span><button id="panTool" title="Drag to pan the enlarged image" aria-pressed="false">Pan</button></div><div class="canvas-stage"><canvas id="canvas" width="640" height="448" tabindex="0" aria-label="640 by 448 video crop. Wheel to zoom. Drag empty space, hold Space, or middle-drag to pan. Alt-click cycles overlapping boxes."></canvas></div><div class="canvas-bottom"><span>640 × 448</span><span id="canvasHint">Select a box</span></div><div class="proposal-tools"><button id="suggestBoxes" disabled>Suggest boxes</button><label for="proposalConfidence">Confidence <input id="proposalConfidence" type="number" min="0.05" max="0.95" step="0.05" value="0.25"></label><label><input id="proposalTiles" type="checkbox" checked> Small-object tiles</label><label class="assist-option"><input id="proposalAssist" type="checkbox" checked> Recover missing parts <small>Focused rescans and estimated partner boxes.</small></label></div><div id="proposalPreview" class="proposal-review" hidden><div class="proposal-tools proposal-preview"><span id="proposalSummary"></span><button id="applyProposals" class="small" title="Add model detections only. Review estimates individually below.">Merge unique boxes</button><button id="discardProposals" class="small">Discard preview</button></div><ul id="proposalWarnings" class="proposal-warnings" hidden></ul><p id="estimateHelp" class="estimate-help" hidden>Amber ? boxes are estimates. Review each before use.</p><div id="proposalEstimates" class="estimate-list" hidden></div></div></section>
+<section id="reviewControls" class="canvas-card review-controls" aria-label="Review tools"><div class="canvas-top"><button id="selectTool" class="active" title="Select, move, resize [V]">Select <kbd>V</kbd></button><button id="drawTool" title="Draw rectangle [D]">Draw <kbd>D</kbd></button><span class="divider"></span><button id="labelsToggle" aria-pressed="false" title="Show class names over the crop">Labels off</button><button id="undo" title="Undo [Ctrl+Z]">Undo</button><button id="delete" title="Delete selected box [Delete]">Delete</button><span id="dirty" class="dirty" hidden>Unsaved</span><span class="divider"></span><label for="gridSize">View</label><select id="gridSize" aria-label="Frames per view"><option value="1">1 frame</option><option value="4">4 frames</option><option value="9">9 frames</option></select></div><div class="view-tools" aria-label="Image view controls"><button id="zoomOut" aria-label="Zoom out">−</button><output id="zoomLevel" aria-live="polite" aria-label="Image zoom">100%</output><button id="zoomIn" aria-label="Zoom in">+</button><button id="zoomReset" title="Fit the complete image">Fit</button><div id="frameNavigation" class="nav"><span id="position" class="muted" style="font-size:12px"></span><button id="previous" title="Previous frame [←]" aria-label="Previous frame">←</button><button id="next" title="Next frame [→]" aria-label="Next frame">→</button></div><div id="gridNavigation" class="nav" hidden><span id="gridPosition" class="muted"></span><button id="gridPrevious" aria-label="Previous grid page">←</button><button id="gridNext" aria-label="Next grid page">→</button></div></div></section><section id="gridView" aria-label="Frame contact sheet" hidden><div id="gridCards" class="grid-cards"></div></section><div id="editor" class="workspace"><section class="canvas-card"><div class="canvas-stage"><canvas id="canvas" width="640" height="448" tabindex="0" aria-label="640 by 448 video crop. Wheel to zoom. Drag empty space, hold Space, or middle-drag to pan. Alt-click cycles overlapping boxes."></canvas></div><div class="canvas-bottom"><span>640 × 448</span><span id="canvasHint">Select a box</span></div><div class="proposal-tools"><button id="suggestBoxes" disabled>Suggest boxes</button><label for="proposalConfidence">Confidence <input id="proposalConfidence" type="number" min="0.05" max="0.95" step="0.05" value="0.25"></label><label><input id="proposalTiles" type="checkbox" checked> Small-object tiles</label><label class="assist-option"><input id="proposalAssist" type="checkbox" checked> Recover missing parts <small>Focused rescans and estimated partner boxes.</small></label></div><div id="proposalPreview" class="proposal-review" hidden><div class="proposal-tools proposal-preview"><span id="proposalSummary"></span><button id="applyProposals" class="small" title="Add model detections only. Review estimates individually below.">Merge unique boxes</button><button id="discardProposals" class="small">Discard preview</button></div><ul id="proposalWarnings" class="proposal-warnings" hidden></ul><p id="estimateHelp" class="estimate-help" hidden>Amber ? boxes are estimates. Review each before use.</p><div id="proposalEstimates" class="estimate-list" hidden></div></div></section>
 <section class="inspect"><div><h2>Add box</h2><div class="legend"><span class="swatch"></span>Head <span class="swatch body" style="margin-left:8px"></span>Body</div><div class="class-tools"><button id="headClass" class="active">Head <kbd>1</kbd></button><button id="bodyClass">Body <kbd>2</kbd></button></div><h2 id="boxCount">0 boxes</h2></div><div id="boxes" class="boxes"></div><div class="selected-controls"><label for="selectedClass" class="muted" style="font-size:11px">Selected box</label><select id="selectedClass" disabled><option value="0">Head</option><option value="1">Body</option></select><div id="coordinates" class="muted" style="font-size:11px">No box selected.</div></div><div id="flags" class="flags"></div></section></div>
 <div id="empty" class="empty" hidden><strong>No frames in this view</strong>Choose another filter to continue.</div>
-<div class="actions"><div class="actions-group"><button id="reject" class="danger">Reject frame</button><button id="save">Save pending</button></div><div class="actions-group"><button id="export" title="Export saved, approved frames from this recording">Export reviewed</button><button id="approve" class="primary">Approve & next</button></div></div><div id="exportHelp" class="help" hidden>Save changes before exporting. Only saved, approved frames are included.</div><div id="notice" class="notice" role="status" aria-live="polite" hidden></div><div id="exportResult" class="export-result"></div>
+<div class="actions"><div class="actions-group"><button id="reject" class="danger">Reject frame</button><button id="save">Save pending</button><button id="restorePending" hidden>Restore to pending</button></div><div class="actions-group"><button id="export" title="Export saved, approved frames from this recording">Export reviewed</button><button id="approve" class="primary">Approve & next</button></div></div><div id="exportHelp" class="help" hidden>Save changes before exporting. Only saved, approved frames are included.</div><div id="notice" class="notice" role="status" aria-live="polite" hidden></div><div id="exportResult" class="export-result"></div>
 </main></div>
 <dialog id="emptyDialog"><h2>Approve an empty frame?</h2><p>Check that no Head or Body is visible. This records a confirmed empty training example.</p><div class="actions-group"><button id="cancelEmpty">Keep reviewing</button><button id="confirmEmpty" class="primary">Approve empty frame</button></div></dialog>
 <dialog id="preparationDialog" class="prepare-dialog"><div class="dialog-title"><h2>Prepare a recording</h2><button id="closePreparation" class="small" aria-label="Close preparation options">Close</button></div><p>Sample a local video into draft frames.</p><div class="picked-video"><strong id="pickedVideoName">No video selected</strong><div id="pickedVideoPath" class="model-detail"></div><div id="pickedVideoMetadata" class="model-detail"></div></div><button id="browseAnotherVideo" class="small">Browse another video…</button><p id="preparationModel" class="prepare-model" title="Uses the detailed view of the selected model family when available."></p><form id="preparationForm"><div class="training-grid prepare-grid"><label for="prepareSampleFps">Samples per second<input id="prepareSampleFps" name="sample_fps" type="number" min="0.1" max="10" step="0.1" value="1" required></label><label for="prepareMaxImages">Maximum images<input id="prepareMaxImages" name="max_images" type="number" min="2" max="5000" value="600" required></label><label for="prepareConfidence">Confidence<input id="prepareConfidence" name="confidence" type="number" min="0.05" max="0.95" step="0.05" value="0.25" required></label></div><label class="training-toggle"><input id="prepareTiles" name="tiles" type="checkbox" checked><span>Use small-object tiles for distant heads</span></label><p>Draft frames require review and approval before training.</p><div id="preparationError" class="workbench-error" role="alert"></div><div class="actions-group"><button id="startPreparation" class="primary" type="submit">Prepare frames</button></div></form></dialog>
@@ -104,11 +105,18 @@ async function api(path, payload, recordingId=selectedRecordingId) {
   return data;
 }
 function visibleFrames() { return manifest ? manifest.frames.filter(item => currentFilter === "all" || item.status === currentFilter) : []; }
+function canReview() { return gridSize===1 && !!frame && !!image && !busy && manifest?.status === "complete"; }
 function canEdit() { return gridSize===1 && !!frame && frame.status!=="auto_removed" && !!image && !busy && manifest?.status === "complete"; }
 function updateButtons() {
-  const editable = canEdit() && !drag;
-  for (const id of ["selectTool","drawTool","headClass","bodyClass","save","approve","reject"]) $(id).disabled = !editable;
-  if(gridSize===1 && frame?.status==="auto_removed") $("save").disabled=!image || busy || !!drag || manifest?.status!=="complete";
+  const editable = canEdit() && !drag, reviewable=canReview() && !drag;
+  for (const id of ["drawTool","headClass","bodyClass","save","approve"]) $(id).disabled = !editable;
+  $("selectTool").disabled=!reviewable;
+  $("reject").disabled=!reviewable;
+  $("restorePending").hidden=gridSize!==1 || frame?.status!=="auto_removed";
+  $("restorePending").disabled=!reviewable;
+  const hasAutoRemoved=manifest?.frames?.some(item=>item.status==="auto_removed");
+  $("rejectAutoRemoved").hidden=currentFilter!=="auto_removed" || !hasAutoRemoved;
+  $("rejectAutoRemoved").disabled=!hasAutoRemoved || busy || dirty || !!drag || manifest?.status!=="complete";
   $("undo").disabled = !editable || !history.length;
   $("delete").disabled = !editable || selected < 0;
   $("selectedClass").disabled = !editable || selected < 0;
@@ -119,8 +127,8 @@ function updateButtons() {
   $("previous").disabled = busy || index <= 0; $("next").disabled = busy || index < 0 || index >= list.length - 1;
   $("position").textContent = index < 0 ? "0 frames" : `${index + 1} / ${list.length}`;
   $("dirty").hidden = !dirty;
-  $("save").textContent=frame?.status==="auto_removed"?"Restore":"Save pending";
   for(const id of ["save","reject","approve"]) $(id).hidden=gridSize!==1;
+  if(frame?.status==="auto_removed") $("save").hidden=true;
   $("gridSize").disabled=busy || !!drag;
   $("frameNavigation").hidden=gridSize!==1;
   updateViewControls();
@@ -134,7 +142,6 @@ function updateViewControls() {
   $("zoomIn").disabled = !image || busy || view.scale >= 8;
   $("zoomOut").disabled = !image || busy || view.scale <= 1;
   $("zoomReset").disabled = !image || busy || view.scale === 1;
-  $("panTool").disabled = !image || busy || view.scale <= 1;
 }
 function clampView() {
   view.x=Math.min(0,Math.max(640*(1-view.scale),view.x));
@@ -157,7 +164,7 @@ function fitImage() {
   view={scale:1,x:0,y:0}; draw(); updateViewControls();
 }
 function updateCursor() {
-  canvas.style.cursor=drag?.kind==='pan'?'grabbing':(spacePan||tool==='pan')?'grab':tool==='draw'?'crosshair':'default';
+  canvas.style.cursor=drag?.kind==='pan'?'grabbing':spacePan?'grab':tool==='draw'?'crosshair':'default';
 }
 function refreshProgress() {
   const counts = {pending:0, approved:0, rejected:0,auto_removed:0};
@@ -292,7 +299,7 @@ function renderBoxes() {
   } else setText($("coordinates"),"No box selected.");
   updateButtons();
 }
-function setTool(value) { tool = value; $("selectTool").classList.toggle("active", value === "select"); $("drawTool").classList.toggle("active", value === "draw"); $("panTool").classList.toggle("active",value==='pan'); $("panTool").setAttribute('aria-pressed',String(value==='pan')); updateCursor(); $("canvasHint").textContent = value === "draw" ? `Draw ${drawClass === 0 ? "Head" : "Body"}` : value==='pan'?'Pan image':"Select a box"; }
+function setTool(value) { tool = value; $("selectTool").classList.toggle("active", value === "select"); $("drawTool").classList.toggle("active", value === "draw"); updateCursor(); $("canvasHint").textContent = value === "draw" ? `Draw ${drawClass === 0 ? "Head" : "Body"}` : "Select a box"; }
 function setClass(value) { drawClass = value; $("headClass").classList.toggle("active", value === 0); $("bodyClass").classList.toggle("active", value === 1); setTool("draw"); }
 function handles(box) { const mx = (box.x1 + box.x2) / 2, my = (box.y1 + box.y2) / 2; return [[box.x1,box.y1,"nw"],[mx,box.y1,"n"],[box.x2,box.y1,"ne"],[box.x2,my,"e"],[box.x2,box.y2,"se"],[mx,box.y2,"s"],[box.x1,box.y2,"sw"],[box.x1,my,"w"]]; }
 function paintBox(box, index, preview = false) {
@@ -335,6 +342,7 @@ async function showFrame(id) {
   if(id!==currentId) view={scale:1,x:0,y:0};
   frame = manifest.frames.find(item => item.id === id) || null; currentId = frame?.id || null;
   boxes = frame ? clone(frame.boxes) : []; selected=-1; history=[]; dirty=false; image=null; drag=null;
+  if(frame?.status==="auto_removed") setTool("select");
   if (imageURL) { URL.revokeObjectURL(imageURL); imageURL=null; }
   $("editor").hidden = !frame || gridSize!==1; $("empty").hidden = !!visibleFrames().length; $("frameTitle").textContent = gridSize!==1?"Frames":frame?.id || "Review queue complete"; $("meta").replaceChildren(); $("flags").textContent="";
   $("meta").hidden=gridSize!==1;
@@ -368,13 +376,14 @@ async function loadManifest() {
   finally { if(current()) { busy=false; updateButtons(); } }
 }
 async function saveFrame(status, emptyConfirmed=false, advance=false) {
-  const restoring=frame?.status==="auto_removed" && status==="pending" && gridSize===1 && !!image && !busy && !drag && manifest?.status==="complete";
-  if(!canEdit() && !restoring) return;
+  const reviewingRemoved=frame?.status==="auto_removed" && ["pending","rejected"].includes(status) && canReview() && !drag;
+  const restoring=reviewingRemoved && status==="pending";
+  if(!canEdit() && !reviewingRemoved) return;
   const generation=recordingSequence, recordingId=selectedRecordingId, frameId=frame.id;
   const previousList=visibleFrames(), previousIndex=previousList.findIndex(item=>item.id===currentId);
   busy=true; updateButtons();
   try {
-    const updated=await api(`/api/frame/${encodeURIComponent(frameId)}`,{revision:frame.revision,boxes:restoring?[]:clone(boxes),status,empty_confirmed:restoring?false:emptyConfirmed},recordingId);
+    const updated=await api(`/api/frame/${encodeURIComponent(frameId)}`,{revision:frame.revision,boxes:reviewingRemoved?[]:clone(boxes),status,empty_confirmed:reviewingRemoved?false:emptyConfirmed},recordingId);
     if(generation!==recordingSequence) return;
     manifest.frames[manifest.frames.findIndex(item=>item.id===updated.id)]=updated; dirty=false;
     const list=visibleFrames(); let target=updated.id;
@@ -384,6 +393,28 @@ async function saveFrame(status, emptyConfirmed=false, advance=false) {
     notice(restoring?"Frame restored to pending.":status === "approved" ? "Frame approved." : status === "rejected" ? "Frame rejected." : "Saved as pending.");
   } catch(error) { if(generation===recordingSequence) { notice(error.message,true); if(error.status===409) notice(`${error.message} Unsaved changes kept. Reload to review the newer revision.`,true); } }
   finally { if(generation===recordingSequence) { busy=false; refreshProgress(); if(scanManifestPending) await refreshScanManifest(); } }
+}
+async function rejectAllAutoRemoved() {
+  if(busy || dirty || drag || manifest?.status!=="complete" || !manifest.frames.some(item=>item.status==="auto_removed")) return;
+  const generation=recordingSequence, recordingId=selectedRecordingId;
+  const index=visibleFrames().findIndex(item=>item.id===currentId);
+  let rejected=null;
+  busy=true; updateButtons();
+  try {
+    const result=await api("/api/frames/reject-auto-removed",{},recordingId);
+    rejected=result.rejected;
+    if(generation!==recordingSequence) return;
+    const loaded=await api("/api/manifest",undefined,recordingId);
+    if(generation!==recordingSequence) return;
+    manifest=loaded;
+    const list=visibleFrames(), target=list.find(item=>item.id===currentId) || list[Math.min(Math.max(index,0),list.length-1)];
+    busy=false; await showFrame(target?.id);
+    if(generation===recordingSequence) notice(`${rejected} auto-removed ${rejected===1?"frame":"frames"} rejected.`);
+  } catch(error) {
+    if(generation===recordingSequence) notice(rejected===null?error.message:`Rejection saved. Reload to refresh the frame list: ${error.message}`,true);
+  } finally {
+    if(generation===recordingSequence) { busy=false; updateButtons(); }
+  }
 }
 function emptyScanActive() { return ["queued","running"].includes(emptyScan?.state); }
 function updateEmptyScanControls() {
@@ -747,12 +778,13 @@ function startPan(event,deselect=false) {
 }
 canvas.addEventListener("pointerdown", event => {
   if(drag) return;
-  if(image && !busy && (event.button===1 || (event.button===0 && (tool==='pan'||spacePan)))) {
+  if(image && !busy && (event.button===1 || (event.button===0 && spacePan))) {
     event.preventDefault(); canvas.focus({preventScroll:true}); canvas.setPointerCapture(event.pointerId);
     startPan(event); return;
   }
-  if(!canEdit() || event.button!==0) return; event.preventDefault(); canvas.focus({preventScroll:true}); const p=point(event);
+  if(!canReview() || event.button!==0) return; event.preventDefault(); canvas.focus({preventScroll:true}); const p=point(event);
   canvas.setPointerCapture(event.pointerId);
+  if(!canEdit()) { startPan(event,true); return; }
   if(tool === "draw") { drag={kind:"draw",pointerId:event.pointerId,start:p,latest:p}; draw(); updateWorkbenchControls(); return; }
   const candidates=hitCandidates(p);
   if(!event.altKey && selected>=0 && boxes[selected] && (!candidates.length || candidates[0]===selected)) {
@@ -809,7 +841,6 @@ function undo() {
   setDirty(restorePreview); renderBoxes(); if(restorePreview) renderProposalPreview(); draw();
 }
 $("selectTool").onclick=()=>setTool("select"); $("drawTool").onclick=()=>setTool("draw"); $("headClass").onclick=()=>setClass(0); $("bodyClass").onclick=()=>setClass(1);
-$("panTool").onclick=()=>setTool('pan');
 $("zoomIn").onclick=()=>zoomTo(view.scale*1.25); $("zoomOut").onclick=()=>zoomTo(view.scale/1.25); $("zoomReset").onclick=fitImage;
 $("labelsToggle").onclick=()=>{ showLabels=!showLabels; $("labelsToggle").setAttribute("aria-pressed",String(showLabels)); $("labelsToggle").textContent=showLabels?"Labels on":"Labels off"; $("labelsToggle").classList.toggle("active",showLabels); draw(); };
 $("delete").onclick=removeSelected; $("undo").onclick=undo;
@@ -823,6 +854,8 @@ $("gridNext").onclick=()=>{ if(!busy && (gridPage+1)*gridSize<visibleFrames().le
 $("startEmptyScan").onclick=()=>emptyScanCommand("/api/empty-scan/start");
 $("cancelEmptyScan").onclick=()=>emptyScanCommand("/api/empty-scan/cancel");
 $("reload").onclick=loadManifest; $("save").onclick=()=>saveFrame("pending"); $("reject").onclick=()=>saveFrame("rejected",false,true);
+$("restorePending").onclick=()=>saveFrame("pending",false,true);
+$("rejectAutoRemoved").onclick=rejectAllAutoRemoved;
 $("approve").onclick=()=>{ if(!canEdit()) return; if(!boxes.length) $("emptyDialog").showModal(); else saveFrame("approved",false,true); };
 $("cancelEmpty").onclick=()=>$("emptyDialog").close(); $("confirmEmpty").onclick=()=>{ $("emptyDialog").close(); saveFrame("approved",true,true); };
 $("export").onclick=async()=>{

@@ -235,6 +235,24 @@ class ReviewStore:
                 raise
             return copy.deepcopy(frame)
 
+    def reject_auto_removed(self):
+        with self._locked():
+            snapshot = self._manifest_snapshot(clone=False)
+            self._complete(snapshot)
+            frames = []
+            count = 0
+            for frame in snapshot['frames']:
+                if frame['status'] == 'auto_removed':
+                    frames.append({**frame, 'status': 'rejected', 'revision': frame['revision'] + 1})
+                    count += 1
+                else:
+                    frames.append(frame)
+            if count:
+                data = {**snapshot, 'frames': frames}
+                signature = atomic_write(self._path('manifest.json'), (json.dumps(data, indent=2, ensure_ascii=False, allow_nan=False) + '\n').encode('utf-8'))
+                self._cache_committed_manifest(data, signature)
+            return {'rejected': count}
+
     def mark_auto_removed(self, frame_id, revision, evidence):
         if type(revision) is not int or revision < 0 or (not isinstance(evidence, dict)):
             raise ValueError('An integer revision and strict empty-scan evidence are required')
@@ -535,6 +553,10 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                     return self._send(200, get_empty_scans().cancel(self._store()))
                 if route == '/api/export':
                     return self._send(200, self._store().export_reviewed())
+                if route == '/api/frames/reject-auto-removed':
+                    if payload:
+                        raise ValueError('Bulk rejection does not accept frame changes')
+                    return self._send(200, self._store().reject_auto_removed())
                 if route == '/api/training/start':
                     return self._send(200, get_workbench().start_training(payload, self._store().export_reviewed))
                 if route == '/api/models/select':
@@ -581,6 +603,9 @@ class EmptyReviewStore(ReviewStore):
 
     def update_frame(self, *args, **kwargs):
         raise ValueError('Open a recording before editing frames')
+
+    def reject_auto_removed(self):
+        raise ValueError('Open a recording before rejecting frames')
 
 def startup_store(run_dir, *, project=PROJECT):
     requested = Path(run_dir).expanduser().resolve()
