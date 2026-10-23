@@ -35,6 +35,7 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid #4b5564;border-
 @media(max-width:760px){.counts{grid-template-columns:repeat(4,1fr)}.empty-scan-controls{margin-bottom:0;padding-bottom:0;border-bottom:0}#startEmptyScan{width:auto}.grid-cards,.grid-cards.nine{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.grid-caption{align-items:flex-start;flex-direction:column;gap:4px;padding:7px}.review-view-tools{flex-wrap:wrap}.review-view-tools .nav{font-size:11px;gap:5px}}
 .grid-picture img{object-fit:contain}@media(min-width:761px){.grid-picture{height:var(--grid-preview-height,auto);aspect-ratio:auto}}
 .review-controls{margin-bottom:12px}.review-controls .view-tools{border-bottom:0}.view-tools .nav{margin-left:auto;white-space:nowrap}.canvas-top label{font-size:12px;color:var(--muted)}.canvas-top select{padding:4px 7px}#rejectAutoRemoved{margin:0 0 12px;text-align:left}
+.grid-review-tools{display:flex;align-items:center;flex-wrap:wrap;gap:7px;padding:8px 10px;border-top:1px solid var(--line);background:#20242a}.grid-review-tools output{font-size:12px;color:var(--muted);min-width:76px}.grid-review-tools button{padding:5px 9px;font-size:12px}.grid-check{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;flex-shrink:0;border:1px solid #5d6878;border-radius:3px;color:transparent;font-size:11px}.grid-caption strong{margin-right:auto}.grid-card.selected{border-color:#b6c8e1;box-shadow:inset 0 0 0 1px #b6c8e1;background:#293443}.grid-card.selected .grid-check{background:#c9d2df;border-color:#c9d2df;color:#171b21}
 </style>
 </head>
 <body>
@@ -44,11 +45,12 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid #4b5564;border-
 <main><div id="running" class="running" hidden>Preparing frames. Open this recording again when it finishes.</div><div class="heading"><div><h1 id="frameTitle">Loading frames</h1><div id="meta" class="meta"></div></div></div>
 <section id="modelBar" class="model-bar" aria-label="Models and training"><div class="model-label"><label for="modelSelect">Model</label><select id="modelSelect" disabled><option value="">Loading models…</option></select><span id="activeModelBadge" class="pill" hidden>Default</span></div><button id="useModel" class="small" disabled>Use as default</button><button id="downloadOnnx" class="small" disabled>Download .onnx</button><button id="downloadPt" class="small" disabled>Download .pt</button><button id="openTraining" class="small training-open" disabled>Train…</button><p id="workbenchStatus" class="help">Loading models…</p><div id="workbenchError" class="workbench-error" role="status" hidden></div></section>
 <section id="trainingStatus" class="job-card" aria-label="Training progress" hidden><div class="job-title"><strong id="jobTitle">Training</strong><button id="viewTraining" class="small">View options</button></div><p id="jobMessage"></p><div class="progress"><div id="jobProgress"></div></div><details><summary class="help">Details and log</summary><div id="jobPath" class="model-detail"></div><pre id="jobLog" class="job-log"></pre></details><div id="trainingDownloads" class="actions-group" hidden><button id="downloadTrainedOnnx" class="small">Download .onnx</button><button id="downloadTrainedPt" class="small">Download .pt</button></div></section>
-<section id="reviewControls" class="canvas-card review-controls" aria-label="Review tools"><div class="canvas-top"><button id="selectTool" class="active" title="Select, move, resize [V]">Select <kbd>V</kbd></button><button id="drawTool" title="Draw rectangle [D]">Draw <kbd>D</kbd></button><span class="divider"></span><button id="labelsToggle" aria-pressed="false" title="Show class names over the crop">Labels off</button><button id="undo" title="Undo [Ctrl+Z]">Undo</button><button id="delete" title="Delete selected box [Delete]">Delete</button><span id="dirty" class="dirty" hidden>Unsaved</span><span class="divider"></span><label for="gridSize">View</label><select id="gridSize" aria-label="Frames per view"><option value="1">1 frame</option><option value="4">4 frames</option><option value="9">9 frames</option></select></div><div class="view-tools" aria-label="Image view controls"><button id="zoomOut" aria-label="Zoom out">−</button><output id="zoomLevel" aria-live="polite" aria-label="Image zoom">100%</output><button id="zoomIn" aria-label="Zoom in">+</button><button id="zoomReset" title="Fit the complete image">Fit</button><div id="frameNavigation" class="nav"><span id="position" class="muted" style="font-size:12px"></span><button id="previous" title="Previous frame [←]" aria-label="Previous frame">←</button><button id="next" title="Next frame [→]" aria-label="Next frame">→</button></div><div id="gridNavigation" class="nav" hidden><span id="gridPosition" class="muted"></span><button id="gridPrevious" aria-label="Previous grid page">←</button><button id="gridNext" aria-label="Next grid page">→</button></div></div></section><section id="gridView" aria-label="Frame contact sheet" hidden><div id="gridCards" class="grid-cards"></div></section><div id="editor" class="workspace"><section class="canvas-card"><div class="canvas-stage"><canvas id="canvas" width="640" height="448" tabindex="0" aria-label="640 by 448 video crop. Wheel to zoom. Drag empty space, hold Space, or middle-drag to pan. Alt-click cycles overlapping boxes."></canvas></div><div class="canvas-bottom"><span>640 × 448</span><span id="canvasHint">Select a box</span></div><div class="proposal-tools"><button id="suggestBoxes" disabled>Suggest boxes</button><label for="proposalConfidence">Confidence <input id="proposalConfidence" type="number" min="0.05" max="0.95" step="0.05" value="0.25"></label><label><input id="proposalTiles" type="checkbox" checked> Small-object tiles</label><label class="assist-option"><input id="proposalAssist" type="checkbox" checked> Recover missing parts <small>Focused rescans and estimated partner boxes.</small></label></div><div id="proposalPreview" class="proposal-review" hidden><div class="proposal-tools proposal-preview"><span id="proposalSummary"></span><button id="applyProposals" class="small" title="Add model detections only. Review estimates individually below.">Merge unique boxes</button><button id="discardProposals" class="small">Discard preview</button></div><ul id="proposalWarnings" class="proposal-warnings" hidden></ul><p id="estimateHelp" class="estimate-help" hidden>Amber ? boxes are estimates. Review each before use.</p><div id="proposalEstimates" class="estimate-list" hidden></div></div></section>
+<section id="reviewControls" class="canvas-card review-controls" aria-label="Review tools"><div class="canvas-top"><button id="selectTool" class="active" title="Select, move, resize [V]">Select <kbd>V</kbd></button><button id="drawTool" title="Draw rectangle [D]">Draw <kbd>D</kbd></button><span class="divider"></span><button id="labelsToggle" aria-pressed="false" title="Show class names over the crop">Labels off</button><button id="undo" title="Undo [Ctrl+Z]">Undo</button><button id="delete" title="Delete selected box [Delete]">Delete</button><span id="dirty" class="dirty" hidden>Unsaved</span><span class="divider"></span><label for="gridSize">View</label><select id="gridSize" aria-label="Frames per view"><option value="1">1 frame</option><option value="4">4 frames</option><option value="9">9 frames</option></select></div><div class="view-tools" aria-label="Image view controls"><button id="zoomOut" aria-label="Zoom out">−</button><output id="zoomLevel" aria-live="polite" aria-label="Image zoom">100%</output><button id="zoomIn" aria-label="Zoom in">+</button><button id="zoomReset" title="Fit the complete image">Fit</button><div id="frameNavigation" class="nav"><span id="position" class="muted" style="font-size:12px"></span><button id="previous" title="Previous frame [←]" aria-label="Previous frame">←</button><button id="next" title="Next frame [→]" aria-label="Next frame">→</button></div><div id="gridNavigation" class="nav" hidden><span id="gridPosition" class="muted"></span><button id="gridPrevious" aria-label="Previous grid page">←</button><button id="gridNext" aria-label="Next grid page">→</button></div></div><div id="gridReviewTools" class="grid-review-tools" role="group" aria-label="Review frames on this page" hidden><output id="gridSelectionCount" aria-live="polite" title="Ctrl-click frames to toggle selection. A normal click opens a frame.">0 selected</output><button id="gridApproveSelected" class="primary" disabled>Approve selected</button><button id="gridRejectSelected" class="danger" disabled>Reject selected</button><span class="divider"></span><button id="gridApproveAll" title="Approve all frames on this page" disabled>Approve all</button><button id="gridRejectAll" class="danger" title="Reject all frames on this page" disabled>Reject all</button></div></section><section id="gridView" aria-label="Frame contact sheet" hidden><div id="gridCards" class="grid-cards"></div></section><div id="editor" class="workspace"><section class="canvas-card"><div class="canvas-stage"><canvas id="canvas" width="640" height="448" tabindex="0" aria-label="640 by 448 video crop. Wheel to zoom. Drag empty space, hold Space, or middle-drag to pan. Alt-click cycles overlapping boxes."></canvas></div><div class="canvas-bottom"><span>640 × 448</span><span id="canvasHint">Select a box</span></div><div class="proposal-tools"><button id="suggestBoxes" disabled>Suggest boxes</button><label for="proposalConfidence">Confidence <input id="proposalConfidence" type="number" min="0.05" max="0.95" step="0.05" value="0.25"></label><label><input id="proposalTiles" type="checkbox" checked> Small-object tiles</label><label class="assist-option"><input id="proposalAssist" type="checkbox" checked> Recover missing parts <small>Focused rescans and estimated partner boxes.</small></label></div><div id="proposalPreview" class="proposal-review" hidden><div class="proposal-tools proposal-preview"><span id="proposalSummary"></span><button id="applyProposals" class="small" title="Add model detections only. Review estimates individually below.">Merge unique boxes</button><button id="discardProposals" class="small">Discard preview</button></div><ul id="proposalWarnings" class="proposal-warnings" hidden></ul><p id="estimateHelp" class="estimate-help" hidden>Amber ? boxes are estimates. Review each before use.</p><div id="proposalEstimates" class="estimate-list" hidden></div></div></section>
 <section class="inspect"><div><h2>Add box</h2><div class="legend"><span class="swatch"></span>Head <span class="swatch body" style="margin-left:8px"></span>Body</div><div class="class-tools"><button id="headClass" class="active">Head <kbd>1</kbd></button><button id="bodyClass">Body <kbd>2</kbd></button></div><h2 id="boxCount">0 boxes</h2></div><div id="boxes" class="boxes"></div><div class="selected-controls"><label for="selectedClass" class="muted" style="font-size:11px">Selected box</label><select id="selectedClass" disabled><option value="0">Head</option><option value="1">Body</option></select><div id="coordinates" class="muted" style="font-size:11px">No box selected.</div></div><div id="flags" class="flags"></div></section></div>
 <div id="empty" class="empty" hidden><strong>No frames in this view</strong>Choose another filter to continue.</div>
 <div class="actions"><div class="actions-group"><button id="reject" class="danger">Reject frame</button><button id="save">Save pending</button><button id="restorePending" hidden>Restore to pending</button></div><div class="actions-group"><button id="export" title="Export saved, approved frames from this recording">Export reviewed</button><button id="approve" class="primary">Approve & next</button></div></div><div id="exportHelp" class="help" hidden>Save changes before exporting. Only saved, approved frames are included.</div><div id="notice" class="notice" role="status" aria-live="polite" hidden></div><div id="exportResult" class="export-result"></div>
 </main></div>
+<dialog id="gridEmptyDialog"><h2>Approve empty frames?</h2><p id="gridEmptyMessage"></p><div class="actions-group"><button id="cancelGridEmpty">Keep reviewing</button><button id="confirmGridEmpty" class="primary">Approve frames</button></div></dialog>
 <dialog id="emptyDialog"><h2>Approve an empty frame?</h2><p>Check that no Head or Body is visible. This records a confirmed empty training example.</p><div class="actions-group"><button id="cancelEmpty">Keep reviewing</button><button id="confirmEmpty" class="primary">Approve empty frame</button></div></dialog>
 <dialog id="preparationDialog" class="prepare-dialog"><div class="dialog-title"><h2>Prepare a recording</h2><button id="closePreparation" class="small" aria-label="Close preparation options">Close</button></div><p>Sample a local video into draft frames.</p><div class="picked-video"><strong id="pickedVideoName">No video selected</strong><div id="pickedVideoPath" class="model-detail"></div><div id="pickedVideoMetadata" class="model-detail"></div></div><button id="browseAnotherVideo" class="small">Browse another video…</button><p id="preparationModel" class="prepare-model" title="Uses the detailed view of the selected model family when available."></p><form id="preparationForm"><div class="training-grid prepare-grid"><label for="prepareSampleFps">Samples per second<input id="prepareSampleFps" name="sample_fps" type="number" min="0.1" max="10" step="0.1" value="1" required></label><label for="prepareMaxImages">Maximum images<input id="prepareMaxImages" name="max_images" type="number" min="2" max="5000" value="600" required></label><label for="prepareConfidence">Confidence<input id="prepareConfidence" name="confidence" type="number" min="0.05" max="0.95" step="0.05" value="0.25" required></label></div><label class="training-toggle"><input id="prepareTiles" name="tiles" type="checkbox" checked><span>Use small-object tiles for distant heads</span></label><p>Draft frames require review and approval before training.</p><div id="preparationError" class="workbench-error" role="alert"></div><div class="actions-group"><button id="startPreparation" class="primary" type="submit">Prepare frames</button></div></form></dialog>
 <dialog id="trainingDialog" class="training-dialog"><div class="dialog-title"><h2>Train Head / Body</h2><button id="closeTraining" class="small" aria-label="Close training options">Close</button></div><p>Starts a PowerShell window with these settings. Add a local best.pt checkpoint to the application folder before training.</p><form id="trainingForm"><div class="training-grid"><label class="wide" for="trainCheckpoint">Starting checkpoint<select id="trainCheckpoint" name="checkpoint_id" required></select></label><label for="trainDevice">Device<select id="trainDevice" name="device" required></select></label><label for="trainEpochs">Epochs<input id="trainEpochs" name="epochs" type="number" min="1" max="1000" required></label><label for="trainBatch">Batch size<input id="trainBatch" name="batch" type="number" min="1" max="128" required></label><label for="trainModelWidth">Model width<input id="trainModelWidth" name="model_width" type="number" min="64" max="1280" step="32" required></label><label for="trainModelHeight">Model height<input id="trainModelHeight" name="model_height" type="number" min="64" max="1280" step="32" required></label><label for="trainWorkers">Data workers<input id="trainWorkers" name="workers" type="number" min="0" max="8" required></label><label for="trainThreads">CPU threads<input id="trainThreads" name="threads" type="number" min="1" max="32" required></label><label for="trainName">Run name<input id="trainName" name="name" pattern="[a-z0-9][a-z0-9_-]*" maxlength="48" required></label></div><p class="training-options-note">Outputs: .pt checkpoint and .onnx model. Width and height must be multiples of 32. ONNX input size is fixed after export; review images stay 640 × 448.</p><label class="training-toggle"><input id="trainAutoActivate" name="auto_activate" type="checkbox" checked title="Applied after a successful export. Training continues if this tab closes."><span>Make the exported model the default</span></label><p id="trainingSourceNote" class="training-options-note">Training uses the currently selected recording. Save and approve corrections before starting; Start exports its saved, approved frames.</p><div id="trainingError" class="workbench-error" role="alert"></div><div class="actions-group"><button id="startTraining" class="primary" type="submit">Start in PowerShell</button></div></form></dialog>
@@ -69,6 +71,7 @@ let workbench = null, workbenchLoading = false, workbenchAction = false, workben
 let recordingLibrary=null, recordingLibraryLoading=false, recordingAction=false, recordingLibraryGeneration=0;
 let selectedRecordingId="", recordingSequence=0, manifestSequence=0, pickedVideo=null, preparationFormReady=false;
 let gridSize=1, gridPage=0, gridSequence=0, gridLoads=[];
+let gridSelection=new Set(), gridSelectionContext="", pendingGridReview=null;
 let emptyScan=null, emptyScanLoading=false, emptyScanAction=false, emptyScanSequence=0, emptyScanAvailable=true;
 let scanManifestPending=false, scanManifestLoading=false, scanMessage="";
 let frameRowGeneration=-1, frameRowCache=new Map(), frameRowsBusy=null, boxRows=[];
@@ -136,6 +139,7 @@ function updateButtons() {
   updateRecordingControls();
   updateEmptyScanControls();
   updateFrameRowDisabled();
+  updateGridReviewControls();
 }
 function updateViewControls() {
   $("zoomLevel").textContent = `${Math.round(view.scale*100)}%`;
@@ -215,6 +219,66 @@ function updateFrameRowDisabled() {
 }
 function formatTime(value) { return Number.isFinite(value) ? `${Math.floor(value / 60)}:${(value % 60).toFixed(2).padStart(5,"0")}` : "Unknown time"; }
 function statusLabel(status) { return status==="auto_removed"?"Auto removed":status[0].toUpperCase()+status.slice(1); }
+function gridPageFrames() { return gridSize===1?[]:visibleFrames().slice(gridPage*gridSize,(gridPage+1)*gridSize); }
+function resetGridSelection() {
+  gridSelection.clear(); gridSelectionContext=""; pendingGridReview=null;
+  $("gridEmptyDialog").close();
+}
+function gridReviewReady(items) {
+  return gridSize!==1 && !busy && !dirty && !drag && manifest?.status==="complete" && items.length>0 && items.every(item=>$("gridCards").querySelector(`[data-frame-id="${item.id}"]`)?.dataset.loaded==="true");
+}
+function updateGridReviewControls() {
+  const items=gridPageFrames(), chosen=items.filter(item=>gridSelection.has(item.id));
+  $("gridReviewTools").hidden=gridSize===1;
+  setText($("gridSelectionCount"),`${chosen.length} selected`);
+  $("gridApproveSelected").disabled=$("gridRejectSelected").disabled=!gridReviewReady(chosen);
+  $("gridApproveAll").disabled=$("gridRejectAll").disabled=!gridReviewReady(items);
+  const pendingItems=items.filter(item=>pendingGridReview?.frames.some(entry=>entry.id===item.id));
+  $("confirmGridEmpty").disabled=!pendingGridReview || pendingGridReview.context!==gridSelectionContext || pendingItems.length!==pendingGridReview.frames.length || !gridReviewReady(pendingItems);
+  for(const card of $("gridCards").children) {
+    const chosen=gridSelection.has(card.dataset.frameId);
+    card.classList.toggle("selected",chosen); card.setAttribute("aria-pressed",String(chosen)); card.disabled=busy;
+  }
+  $("gridPrevious").disabled=busy || gridPage===0;
+  $("gridNext").disabled=busy || (gridPage+1)*gridSize>=visibleFrames().length;
+}
+function toggleGridSelection(id) {
+  const item=gridPageFrames().find(item=>item.id===id);
+  if(!item || !gridReviewReady([item])) return;
+  if(gridSelection.has(id)) gridSelection.delete(id); else gridSelection.add(id);
+  updateGridReviewControls();
+}
+function requestGridReview(status,all=false) {
+  const items=gridPageFrames().filter(item=>all || gridSelection.has(item.id));
+  if(!gridReviewReady(items)) return;
+  const request={status,frames:items.map(item=>({id:item.id,revision:item.revision})),context:gridSelectionContext,generation:recordingSequence,recordingId:selectedRecordingId};
+  const empty=items.filter(item=>!item.boxes.length && !item.empty_confirmed).length;
+  if(status==="approved" && empty) {
+    pendingGridReview=request;
+    updateGridReviewControls();
+    $("gridEmptyMessage").textContent=`${empty} ${empty===1?"frame has":"frames have"} no boxes. Confirm no Head or Body is visible in ${empty===1?"it":"them"}. This approves ${items.length} ${items.length===1?"frame":"frames"} and records the empty ${empty===1?"frame":"frames"} as negative training examples.`;
+    $("gridEmptyDialog").showModal();
+  } else applyGridReview(request,false);
+}
+async function applyGridReview(request,emptyConfirmed) {
+  if(!request || request.generation!==recordingSequence || request.context!==gridSelectionContext) { notice("Frames changed. Review this page again.",true); return; }
+  const wanted=new Set(request.frames.map(item=>item.id)), items=gridPageFrames().filter(item=>wanted.has(item.id));
+  if(items.length!==request.frames.length || !gridReviewReady(items)) { notice("Wait for the selected images to load, then try again.",true); return; }
+  const generation=request.generation, recordingId=request.recordingId;
+  pendingGridReview=null; $("gridEmptyDialog").close();
+  manifestSequence++; busy=true; updateButtons();
+  try {
+    const result=await api("/api/frames/review",{frames:request.frames,status:request.status,empty_confirmed:emptyConfirmed},recordingId);
+    if(generation!==recordingSequence) return;
+    const changed=new Map(result.frames.map(item=>[item.id,item]));
+    manifest.frames=manifest.frames.map(item=>changed.get(item.id)||item);
+    resetGridSelection(); busy=false;
+    const list=visibleFrames(), target=list.find(item=>item.id===currentId) || list[Math.min(gridPage*gridSize,list.length-1)];
+    await showFrame(target?.id);
+    if(generation===recordingSequence) notice(`${result.frames.length} ${result.frames.length===1?"frame":"frames"} ${request.status}.`);
+  } catch(error) { if(generation===recordingSequence) notice(error.message,true); }
+  finally { if(generation===recordingSequence) { busy=false; updateButtons(); if(scanManifestPending) await refreshScanManifest(); } }
+}
 function clearGridImages() {
   gridSequence++;
   for(const item of gridLoads) { item.controller.abort(); if(item.url) URL.revokeObjectURL(item.url); }
@@ -233,15 +297,18 @@ function renderGrid() {
   clearGridImages(); $("gridCards").replaceChildren();
   const list=visibleFrames(), active=gridSize!==1;
   $("gridView").hidden=!active || !list.length; $("gridNavigation").hidden=!active;
-  if(!active) return;
+  if(!active) { resetGridSelection(); updateGridReviewControls(); return; }
   gridPage=Math.min(Math.max(0,gridPage),Math.max(0,Math.ceil(list.length/gridSize)-1));
   const start=gridPage*gridSize, items=list.slice(start,start+gridSize), sequence=gridSequence, generation=recordingSequence, recordingId=selectedRecordingId;
+  const context=`${recordingSequence}|${gridSize}|${gridPage}|${currentFilter}|${items.map(item=>`${item.id}:${item.revision}`).join(",")}`;
+  if(context!==gridSelectionContext) { resetGridSelection(); gridSelectionContext=context; }
   $("gridPosition").textContent=items.length?`${start+1}–${start+items.length} / ${list.length}`:"0 frames";
   $("gridPrevious").disabled=busy || gridPage===0; $("gridNext").disabled=busy || start+gridSize>=list.length;
   $("gridCards").classList.toggle("nine",gridSize===9);
   for(const item of items) {
     const card=document.createElement("button"); card.type="button"; card.className=`grid-card ${item.status}`; card.dataset.frameId=item.id;
-    card.setAttribute("aria-label",`${item.id}, ${statusLabel(item.status)}. Open frame`); card.onclick=()=>navigate(item.id);
+    card.setAttribute("aria-label",`${item.id}, ${statusLabel(item.status)}. Open frame; Ctrl-click to select`);
+    card.onclick=event=>{ if(event.ctrlKey || event.metaKey) { event.preventDefault(); toggleGridSelection(item.id); } else navigate(item.id); };
     const picture=document.createElement("div"); picture.className="grid-picture";
     const loading=document.createElement("span"); loading.className="grid-loading"; loading.textContent="Loading…";
     const img=document.createElement("img"); img.alt="";
@@ -254,7 +321,8 @@ function renderGrid() {
     }
     picture.append(img,overlay,loading);
     const caption=document.createElement("div"); caption.className="grid-caption"; const label=document.createElement("strong"),status=document.createElement("span");
-    label.textContent=item.id; status.className=`pill ${item.status}`; status.textContent=statusLabel(item.status); caption.append(label,status);card.append(picture,caption); $("gridCards").append(card);
+    const check=document.createElement("span"); check.className="grid-check"; check.textContent="✓"; check.setAttribute("aria-hidden","true");
+    label.textContent=item.id; status.className=`pill ${item.status}`; status.textContent=statusLabel(item.status); caption.append(check,label,status);card.append(picture,caption); $("gridCards").append(card);
     const load={controller:new AbortController(),url:null}; gridLoads.push(load);
     (async()=>{
       try {
@@ -264,17 +332,17 @@ function renderGrid() {
         load.url=URL.createObjectURL(blob); img.src=load.url; await img.decode();
         if(sequence!==gridSequence || generation!==recordingSequence) return;
         if(img.naturalWidth!==640 || img.naturalHeight!==448) throw new Error("Invalid crop size");
-        card.dataset.loaded="true";
+        card.dataset.loaded="true"; updateGridReviewControls();
       } catch(error) { if(sequence===gridSequence && generation===recordingSequence && error.name!=="AbortError") { card.dataset.error="true"; loading.textContent=error.message || "Image unavailable"; } }
     })();
   }
-  fitGridToViewport();
+  updateGridReviewControls(); fitGridToViewport();
 }
 async function changeGridSize(value) {
   if(busy || drag || !discardOkay()) { $("gridSize").value=String(gridSize); return; }
   const index=visibleFrames().findIndex(item=>item.id===currentId);
   const target=value===1?visibleFrames()[gridPage*gridSize]?.id:currentId;
-  gridSize=value; gridPage=value===1?0:Math.floor(Math.max(0,index)/value); $("gridSize").value=String(value);
+  resetGridSelection(); gridSize=value; gridPage=value===1?0:Math.floor(Math.max(0,index)/value); $("gridSize").value=String(value);
   await showFrame(target);
 }
 function setDirty(keepProposal=false) { dirty = !!frame && JSON.stringify(boxes) !== JSON.stringify(frame.boxes); editVersion++; if(keepProposal && proposal) proposal.version=editVersion; else clearProposals(); updateButtons(); }
@@ -334,7 +402,7 @@ function draw() {
   ctx.restore();
 }
 function discardOkay() { return !dirty || window.confirm("Discard unsaved box corrections for this frame?"); }
-async function navigate(id) { if (busy || (id === currentId && gridSize===1) || !discardOkay()) return; gridSize=1; $("gridSize").value="1"; await showFrame(id); }
+async function navigate(id) { if (busy || (id === currentId && gridSize===1) || !discardOkay()) return; resetGridSelection(); gridSize=1; $("gridSize").value="1"; await showFrame(id); }
 async function showFrame(id) {
   const sequence = ++loadSequence;
   const recordingGeneration=recordingSequence, recordingId=selectedRecordingId;
@@ -540,7 +608,7 @@ async function openRecording(id) {
   if(id===selectedRecordingId) { await loadManifest(); return; }
   if(!discardOkay()) { $("recordingSelect").value=selectedRecordingId; return; }
   selectedRecordingId=id; recordingSequence++; manifestSequence++; busy=false;
-  clearGridImages(); gridPage=0; resetEmptyScan();
+  clearGridImages(); resetGridSelection(); gridPage=0; resetEmptyScan();
   view={scale:1,x:0,y:0}; manifest={status:"loading",frames:[]};
   $("exportResult").textContent=""; $("emptyDialog").close();
   await showFrame(undefined); $("frameTitle").textContent="Loading recording…";
@@ -847,10 +915,17 @@ $("delete").onclick=removeSelected; $("undo").onclick=undo;
 $("selectedClass").onchange=()=>{ if(!canEdit()||selected<0) return; pushHistory(); boxes[selected].class_id=Number($("selectedClass").value); delete boxes[selected].score; setDirty(); renderBoxes(); draw(); };
 $("previous").onclick=()=>{ const list=visibleFrames(), index=list.findIndex(item=>item.id===currentId); if(index>0) navigate(list[index-1].id); };
 $("next").onclick=()=>{ const list=visibleFrames(), index=list.findIndex(item=>item.id===currentId); if(index<list.length-1) navigate(list[index+1].id); };
-$("filter").onchange=async()=>{ if(!discardOkay()) { $("filter").value=currentFilter; return; } currentFilter=$("filter").value; gridPage=0; await showFrame(visibleFrames()[0]?.id); };
+$("filter").onchange=async()=>{ if(!discardOkay()) { $("filter").value=currentFilter; return; } resetGridSelection(); currentFilter=$("filter").value; gridPage=0; await showFrame(visibleFrames()[0]?.id); };
 $("gridSize").onchange=()=>changeGridSize(Number($("gridSize").value));
-$("gridPrevious").onclick=()=>{ if(!busy && gridPage>0) { gridPage--; renderGrid(); } };
-$("gridNext").onclick=()=>{ if(!busy && (gridPage+1)*gridSize<visibleFrames().length) { gridPage++; renderGrid(); } };
+$("gridPrevious").onclick=()=>{ if(!busy && gridPage>0) { resetGridSelection(); gridPage--; renderGrid(); } };
+$("gridNext").onclick=()=>{ if(!busy && (gridPage+1)*gridSize<visibleFrames().length) { resetGridSelection(); gridPage++; renderGrid(); } };
+$("gridApproveSelected").onclick=()=>requestGridReview("approved");
+$("gridRejectSelected").onclick=()=>requestGridReview("rejected");
+$("gridApproveAll").onclick=()=>requestGridReview("approved",true);
+$("gridRejectAll").onclick=()=>requestGridReview("rejected",true);
+$("cancelGridEmpty").onclick=()=>{ pendingGridReview=null; $("gridEmptyDialog").close(); };
+$("gridEmptyDialog").addEventListener("cancel",()=>{ pendingGridReview=null; });
+$("confirmGridEmpty").onclick=()=>applyGridReview(pendingGridReview,true);
 $("startEmptyScan").onclick=()=>emptyScanCommand("/api/empty-scan/start");
 $("cancelEmptyScan").onclick=()=>emptyScanCommand("/api/empty-scan/cancel");
 $("reload").onclick=loadManifest; $("save").onclick=()=>saveFrame("pending"); $("reject").onclick=()=>saveFrame("rejected",false,true);
@@ -908,7 +983,7 @@ $("proposalAssist").onchange=()=>{ clearProposals(); updateWorkbenchControls(); 
 $("discardProposals").onclick=()=>{ clearProposals(); updateWorkbenchControls(); draw(); notice(""); };
 document.addEventListener("keydown",event=>{
   if(event.key==="Escape" && drag) { event.preventDefault(); finishDrag(null,true); return; }
-  if($("emptyDialog").open || $("trainingDialog").open || $("preparationDialog").open || /INPUT|SELECT|TEXTAREA/.test(event.target.tagName)) return;
+  if($("gridEmptyDialog").open || $("emptyDialog").open || $("trainingDialog").open || $("preparationDialog").open || /INPUT|SELECT|TEXTAREA/.test(event.target.tagName)) return;
   if(event.code==='Space' && document.activeElement===canvas && image) { event.preventDefault(); spacePan=true; updateCursor(); return; }
   if(drag) return;
   if(gridSize!==1) { if(event.key==="ArrowLeft" || event.key==="ArrowRight") { event.preventDefault(); $(event.key==="ArrowLeft"?"gridPrevious":"gridNext").click(); } return; }

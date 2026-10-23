@@ -235,6 +235,46 @@ class ReviewStore:
                 raise
             return copy.deepcopy(frame)
 
+    def review_frames(self, payload):
+        if not isinstance(payload, dict) or set(payload) != {'frames', 'status', 'empty_confirmed'}:
+            raise ValueError('Expected frames, status, and empty_confirmed')
+        entries, status, confirmed = (payload['frames'], payload['status'], payload['empty_confirmed'])
+        if status not in ('approved', 'rejected') or type(confirmed) is not bool:
+            raise ValueError('Expected approved or rejected status and boolean empty_confirmed')
+        if not isinstance(entries, list) or not 1 <= len(entries) <= 9:
+            raise ValueError('Choose between 1 and 9 frames from the visible page')
+        revisions = {}
+        for entry in entries:
+            if not isinstance(entry, dict) or set(entry) != {'id', 'revision'}:
+                raise ValueError('Each frame requires only id and revision')
+            frame_id, revision = (entry['id'], entry['revision'])
+            if not isinstance(frame_id, str) or not FRAME_ID.fullmatch(frame_id) or type(revision) is not int or revision < 0:
+                raise ValueError('Each frame requires a valid id and non-negative integer revision')
+            if frame_id in revisions:
+                raise ValueError('Choose each frame only once')
+            revisions[frame_id] = revision
+        with self._locked():
+            snapshot = self._manifest_snapshot(clone=False)
+            self._complete(snapshot)
+            originals = {frame['id']: frame for frame in snapshot['frames'] if frame['id'] in revisions}
+            if len(originals) != len(revisions):
+                raise KeyError('Unknown frame ID')
+            updated = {}
+            for frame_id, revision in revisions.items():
+                frame = originals[frame_id]
+                if frame['revision'] != revision:
+                    raise RevisionConflict('A selected frame changed in another tab. Reload this page before reviewing it again.')
+                empty = frame['empty_confirmed']
+                if status == 'approved' and not frame['boxes']:
+                    if not empty and not confirmed:
+                        raise ValueError('Explicitly confirm empty frames before approving them as negative examples')
+                    empty = True
+                updated[frame_id] = {**frame, 'status': status, 'empty_confirmed': empty, 'revision': revision + 1}
+            data = {**snapshot, 'frames': [updated.get(frame['id'], frame) for frame in snapshot['frames']]}
+            signature = atomic_write(self._path('manifest.json'), (json.dumps(data, indent=2, ensure_ascii=False, allow_nan=False) + '\n').encode('utf-8'))
+            self._cache_committed_manifest(data, signature)
+            return {'frames': copy.deepcopy(list(updated.values()))}
+
     def reject_auto_removed(self):
         with self._locked():
             snapshot = self._manifest_snapshot(clone=False)
@@ -557,6 +597,8 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                     if payload:
                         raise ValueError('Bulk rejection does not accept frame changes')
                     return self._send(200, self._store().reject_auto_removed())
+                if route == '/api/frames/review':
+                    return self._send(200, self._store().review_frames(payload))
                 if route == '/api/training/start':
                     return self._send(200, get_workbench().start_training(payload, self._store().export_reviewed))
                 if route == '/api/models/select':
@@ -606,6 +648,9 @@ class EmptyReviewStore(ReviewStore):
 
     def reject_auto_removed(self):
         raise ValueError('Open a recording before rejecting frames')
+
+    def review_frames(self, payload):
+        raise ValueError('Open a recording before reviewing frames')
 
 def startup_store(run_dir, *, project=PROJECT):
     requested = Path(run_dir).expanduser().resolve()
