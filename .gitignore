@@ -11,6 +11,7 @@ export-env/
 *.pt
 *.pth
 *.onnx
+!/best.onnx
 *.onnx.data
 *.engine
 *.safetensors
