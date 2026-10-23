@@ -1,0 +1,878 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Head / Body · Dataset review</title>
+<style>
+:root{color-scheme:dark;--bg:#121417;--panel:#1b1e23;--line:#32373f;--ink:#e8ebef;--muted:#a0a8b4;--accent:#c9d2df;--green:#b2efbc;--amber:#edc376;--head:#b2efbc;--body:#80b9fc;font:13px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink)}
+button,select,input{font:inherit;color:inherit;background:#242830;border:1px solid #3c434e;border-radius:4px;padding:6px 10px;min-width:0}
+button,select{cursor:pointer}button:hover{background:#303640;border-color:#596474}button:disabled,select:disabled{opacity:.42;cursor:default}
+button:focus-visible,select:focus-visible,input:focus-visible,canvas:focus-visible{outline:2px solid #a9bbd4;outline-offset:2px}
+button.active{background:#343d4a;border-color:#74849a;color:#f0f3f8}button.primary{background:var(--accent);border-color:var(--accent);color:#171b21;font-weight:600}button.primary:hover{background:#e0e6ee;border-color:#e0e6ee}button.danger{color:#e9aaa6}button.small{font-size:12px;padding:5px 9px}
+header{height:56px;padding:12px 24px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:16px}.brand{font-size:17px;font-weight:600;letter-spacing:-.3px}.brand span{font-size:12px;font-weight:400;color:var(--muted);margin-left:12px}.local{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:12px}
+.layout{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:calc(100vh - 56px)}aside{border-right:1px solid var(--line);padding:20px 16px;display:flex;flex-direction:column;min-height:0}main{min-width:0;padding:20px 24px}
+h1{font-size:22px;font-weight:600;letter-spacing:-.4px;margin:0}h2{font-size:13px;font-weight:600;margin:0 0 10px}.muted{color:var(--muted)}.source{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px}.progress{height:4px;background:#303640;border-radius:3px;margin:12px 0 8px;overflow:hidden}.progress div{height:100%;background:#91a1b8;width:0}.counts{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:12px 0 20px}.counts strong{display:block;font-size:19px;font-weight:500;font-variant-numeric:tabular-nums}.counts span{font-size:11px;color:var(--muted)}.filter{width:100%;margin:5px 0 12px}.frame-list{display:flex;flex-direction:column;gap:4px;max-height:58vh;overflow:auto}.frame-item{display:flex;justify-content:space-between;gap:8px;text-align:left;background:transparent;padding:8px;border:1px solid transparent;font-size:12px}.frame-item.current{border-color:#637188;background:#28313e}.frame-item .secondary{font-size:10px;color:var(--muted)}.frame-item .mark{align-self:center;color:var(--muted)}.frame-item.approved .mark{color:var(--green)}.frame-item.rejected .mark{color:#d59e9a}
+.heading{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:14px}.meta{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:11px;color:var(--muted)}.pill{background:#262c35;border:1px solid #3c4553;border-radius:4px;padding:1px 6px;color:#c3ccd8}.pill.pending{color:var(--amber)}.pill.approved{color:var(--green)}.pill.rejected{color:#e9aaa6}.nav{display:flex;align-items:center;gap:7px}.workspace{display:grid;grid-template-columns:minmax(0,1fr) 218px;gap:14px}
+.canvas-card{min-width:0;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#0b0d10}.canvas-top,.view-tools{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 10px;background:#20242a;border-bottom:1px solid var(--line)}.divider{height:18px;width:1px;background:#444b56;margin:0 3px}.view-tools{background:#191d23;padding:7px 10px}.view-tools button{padding:4px 9px}.view-tools output{min-width:46px;text-align:center;font-size:12px;font-variant-numeric:tabular-nums}.canvas-stage{padding:12px;min-height:280px;display:flex;align-items:center;justify-content:center;position:relative}canvas{display:block;width:100%;height:auto;aspect-ratio:640/448;background:#090c10;max-width:960px;touch-action:none;cursor:crosshair}.canvas-bottom{padding:7px 11px;font-size:11px;color:var(--muted);border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:10px}
+.inspect{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px;align-self:start}.legend{display:flex;align-items:center;gap:7px;font-size:12px}.swatch{height:8px;width:8px;border-radius:2px;background:var(--head)}.swatch.body{background:var(--body)}.class-tools{display:flex;gap:7px;margin:10px 0 16px}.class-tools button{flex:1}#headClass{color:var(--head)}#bodyClass{color:var(--body)}#headClass.active{border-color:#82b58b;background:#28352d}#bodyClass.active{border-color:#6a96c9;background:#263447}.help{font-size:11px;color:var(--muted);margin-top:10px}.boxes{display:flex;flex-direction:column;gap:5px;max-height:290px;overflow:auto;margin:10px 0}.box-row{display:flex;align-items:center;justify-content:space-between;text-align:left;font-size:12px;background:#232831;padding:7px 8px}.box-row.selected{border-color:#91a1b8;background:#2b3441}.box-row small{font-size:10px;color:var(--muted)}.selected-controls{border-top:1px solid var(--line);padding-top:12px}.selected-controls select{width:100%;margin:6px 0}summary{cursor:pointer}.flags{margin:14px 0 0;font-size:11px;color:var(--amber);overflow-wrap:anywhere}
+.actions{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}.actions-group{display:flex;gap:7px}.notice{margin-top:9px;font-size:12px;color:#bcc7d6;overflow-wrap:anywhere}.notice.error,.workbench-error{color:#f0aaa2}.export-result{font-size:12px;color:#c5cfdd;margin-top:9px;white-space:pre-wrap;overflow-wrap:anywhere}.empty{padding:36px;text-align:center;color:var(--muted)}.empty strong{display:block;font-size:18px;color:var(--ink);margin-bottom:6px}kbd{font:10px system-ui;border:1px solid #4c5665;border-radius:3px;padding:0 3px;color:var(--muted)}.dirty{color:var(--amber);font-size:11px}.running{margin:0 0 14px;padding:10px 12px;background:#29261e;border:1px solid #6b5c3d;border-radius:5px;color:var(--amber);font-size:12px}
+.model-bar,.recording-bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:10px 12px;margin-bottom:14px;border:1px solid var(--line);background:var(--panel);border-radius:6px}.model-bar label,.recording-bar label{font-size:12px;color:var(--muted)}.model-bar select{max-width:300px;min-width:150px;flex:1}.model-label{display:flex;align-items:center;gap:8px;flex:1;min-width:230px}.model-bar .training-open{margin-left:auto}.model-bar .help,.recording-bar .help{width:100%;min-width:0;margin:0;overflow-wrap:anywhere;font-size:11px}.model-bar .pill{font-size:10px;white-space:nowrap}.recording-bar select{flex:1;min-width:180px;max-width:490px}.recording-bar .workbench-error{width:100%}
+.proposal-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:9px 10px;border-top:1px solid var(--line);background:#1b2027}.proposal-tools label{font-size:11px;color:var(--muted);display:flex;gap:6px;align-items:center}.proposal-tools input[type=number]{width:64px;padding:4px 6px}.assist-option{flex-wrap:wrap}.assist-option small{font-size:11px;color:var(--muted)}input[type=checkbox]{accent-color:#a1b1c8;padding:0;margin:0}.proposal-review{background:#1b1e23;border-top:1px solid #675c42}.proposal-preview{color:#c6ccd5;background:#22262d;border:0}.proposal-preview span{flex:1;min-width:190px;font-size:12px}.proposal-warnings{font-size:11px;color:var(--amber);padding:0 28px 8px;margin:0;overflow-wrap:anywhere}.estimate-help{font-size:11px;color:var(--amber);padding:0 10px;margin:0 0 9px}.estimate-list{display:grid;gap:7px;padding:0 10px 10px}.estimate-row{border:1px dashed #7f704f;border-radius:4px;padding:9px;background:#24231f;display:flex;gap:10px;align-items:flex-start}.estimate-copy{flex:1;min-width:0;overflow-wrap:anywhere}.estimate-copy strong{font-size:12px;color:var(--amber)}.estimate-copy p{margin:3px 0 0;font-size:11px;color:var(--muted)}.estimate-actions{display:flex;gap:6px;flex-wrap:wrap}.estimate-use{border-color:#807253;color:var(--amber)}
+.job-card{padding:10px 12px;margin-bottom:14px;background:var(--panel);border:1px solid #414b5a;border-radius:6px}.job-title{display:flex;align-items:center;justify-content:space-between;gap:12px}.job-title strong{font-size:13px;font-weight:600}.job-card p{font-size:12px;margin:5px 0;color:var(--muted)}.job-card .progress{margin:8px 0}.job-card.failed{border-color:#895b57;background:#292022}.job-log{white-space:pre-wrap;overflow:auto;max-height:150px;font:11px/1.5 ui-monospace,monospace;color:#bac4d1;background:#12161c;padding:9px;border-radius:4px;margin:8px 0 0;overflow-wrap:anywhere}.workbench-error{font-size:12px;overflow-wrap:anywhere}.model-detail{font:11px/1.5 ui-monospace,monospace;color:var(--muted);overflow-wrap:anywhere}
+dialog{background:var(--panel);color:var(--ink);border:1px solid #4b5564;border-radius:8px;padding:22px;width:420px;max-width:calc(100vw - 32px);max-height:calc(100dvh - 32px);overflow:auto}dialog::backdrop{background:#080a0db8}dialog h2{font-size:19px;font-weight:600}dialog p{color:var(--muted);font-size:12px}dialog .actions-group{justify-content:flex-end;margin-top:18px}.dialog-title{display:flex;justify-content:space-between;align-items:center;gap:16px}.dialog-title h2{margin:0}.training-dialog{width:710px}.prepare-dialog{width:630px}.training-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:16px 0}.training-grid label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted)}.training-grid select{width:100%;min-width:0}.training-grid .wide{grid-column:span 2}.training-toggle{display:flex;align-items:flex-start;gap:8px;color:var(--ink);font-size:12px;margin:13px 0}.training-toggle input{margin-top:3px}.training-options-note{font-size:11px}.picked-video{padding:10px;background:#14181e;border:1px solid var(--line);border-radius:5px;margin:14px 0 10px;overflow-wrap:anywhere}.picked-video strong{display:block;font-size:13px}.picked-video .model-detail{margin-top:4px}.prepare-model{font-size:12px;color:#c0cad8;overflow-wrap:anywhere}.prepare-grid{grid-template-columns:repeat(3,minmax(0,1fr))}[hidden]{display:none!important}
+@media(max-width:1150px){.workspace{grid-template-columns:minmax(0,1fr)}.inspect{display:grid;grid-template-columns:1fr 1fr;gap:0 20px}.inspect .boxes{grid-row:1/5;grid-column:2}.inspect .selected-controls{grid-column:1}.flags{grid-column:1/-1}main{padding:18px}}
+@media(max-width:760px){header{padding:10px 14px}.brand{font-size:16px}.brand span{display:block;font-size:11px;margin-left:0}.layout{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid var(--line);padding:14px}.counts{margin:8px 0 10px}.frame-list{display:none}.heading{align-items:flex-start}h1{font-size:20px}main{padding:14px 10px}.canvas-stage{padding:5px;min-height:200px}.actions{align-items:flex-start;flex-wrap:wrap}.actions-group{flex-wrap:wrap}.local{font-size:11px;gap:8px}.canvas-top button{padding:5px 7px;font-size:12px}.model-bar,.recording-bar{padding:9px}.model-bar .training-open{margin-left:0}.model-label{min-width:100%;flex-wrap:wrap}.model-bar select{max-width:100%}.recording-bar label{width:100%}.recording-bar select{max-width:100%;flex-basis:100%}.training-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.training-grid .wide{grid-column:span 2}.training-dialog,.prepare-dialog{padding:18px}.prepare-grid label:last-child{grid-column:1/-1}.estimate-row{flex-wrap:wrap}.estimate-copy{flex-basis:100%}.assist-option small{width:100%}}
+
+#reviewSidebar{position:sticky;top:0;height:100dvh;align-self:start;overflow:hidden;padding:16px 12px;gap:16px}.sidebar-nav{display:flex;flex-direction:column;gap:4px;flex-shrink:0}.sidebar-nav button{text-align:left;padding:8px 10px;background:transparent;border-color:transparent}.sidebar-nav button.active{background:#2b3441;border-color:#637188}.sidebar-panel{display:flex;flex-direction:column;min-height:0;flex:1}.sidebar-panel .frame-list{flex:1;min-height:0;max-height:none;overscroll-behavior:contain}.recordings-scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain}.recording-footer{display:flex;flex-direction:column;gap:7px;padding-top:12px;margin-top:12px;border-top:1px solid var(--line);flex-shrink:0}.recording-footer button{width:100%;text-align:left}.sidebar-panel .recording-bar{display:flex;flex-direction:column;align-items:stretch;border:0;background:transparent;padding:0;margin-bottom:12px}.sidebar-panel .recording-bar select{width:100%;min-width:0;max-width:none;min-height:190px;flex:none;padding:3px}.sidebar-panel .recording-bar option{padding:7px 5px;font-size:11px}.sidebar-panel .recording-bar label{width:auto}.sidebar-panel .job-card{padding:9px;margin-bottom:0}.sidebar-panel .job-title{align-items:flex-start;flex-direction:column;gap:7px}.sidebar-panel .job-title button{align-self:flex-start}.sidebar-panel .model-detail{font-size:10px}.sidebar-panel .job-log{max-height:140px;font-size:10px}#recordingUnavailable{margin:0 0 12px}
+.editing-toast{position:fixed;right:20px;bottom:18px;width:430px;max-width:calc(100vw - 32px);padding:13px 14px;background:#252c36;color:var(--ink);border:1px solid #627087;border-radius:6px;box-shadow:0 6px 24px #0005;z-index:10;pointer-events:none}.editing-toast .toast-heading{display:flex;align-items:center;justify-content:space-between;gap:14px}.editing-toast strong{font-size:12px;font-weight:600}.editing-toast p{font-size:12px;color:#c0c9d7;margin:7px 0 0}.editing-toast button{pointer-events:auto}
+@media(max-width:760px){#reviewSidebar{position:static;height:auto;overflow:visible;padding:12px;gap:12px}.sidebar-nav{flex-direction:row}.sidebar-nav button{flex:1;text-align:center}.sidebar-panel .frame-list{display:none}.recordings-scroll{max-height:45dvh;flex:none}.sidebar-panel .recording-bar select{min-height:130px;height:150px}.sidebar-panel .recording-bar{margin-bottom:10px}.recording-footer{flex-direction:row;padding-top:10px;margin-top:10px}.recording-footer button{text-align:center}.editing-toast{right:12px;bottom:12px;max-width:calc(100vw - 24px)}}
+
+.counts{grid-template-columns:repeat(2,1fr);margin-bottom:12px}.counts strong{font-size:18px}.pill.auto_removed{color:#b7a7c8}.frame-item.auto_removed .mark{color:#b7a7c8}
+.empty-scan-controls{flex-shrink:0;margin:0 0 12px;padding-bottom:12px;border-bottom:1px solid var(--line)}#startEmptyScan{width:100%;text-align:left}#emptyScanStatus{margin-top:9px;font-size:11px;color:var(--muted)}.scan-heading{display:flex;align-items:center;justify-content:space-between;gap:6px}.scan-heading strong{font-size:11px;color:var(--ink);font-weight:500}#emptyScanStatus p{margin:5px 0;overflow-wrap:anywhere}#emptyScanStatus .progress{margin:7px 0}#emptyScanModel{margin-top:3px;overflow-wrap:anywhere}#emptyScanError{margin:7px 0 0;font-size:11px}
+.review-view-tools{display:flex;align-items:center;gap:9px;margin:0 0 12px;font-size:12px}.review-view-tools label{color:var(--muted)}.review-view-tools .nav{margin-left:auto}.grid-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.grid-cards.nine{grid-template-columns:repeat(3,minmax(0,1fr))}.grid-card{padding:0;overflow:hidden;text-align:left;background:var(--panel);border-color:var(--line);min-width:0}.grid-card:hover{border-color:#8291a5}.grid-picture{position:relative;aspect-ratio:640/448;background:#090c10;overflow:hidden}.grid-picture img,.grid-picture svg{position:absolute;inset:0;width:100%;height:100%;display:block}.grid-picture svg{pointer-events:none}.grid-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted);padding:12px}.grid-card[data-loaded="true"] .grid-loading{display:none}.grid-card[data-error="true"] .grid-loading{color:#f0aaa2}.grid-caption{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;font-size:11px}.grid-caption strong{font-weight:500;overflow:hidden;text-overflow:ellipsis}.grid-caption .pill{white-space:nowrap;font-size:10px}.grid-card.auto_removed .grid-picture{opacity:.65}
+@media(max-width:760px){.counts{grid-template-columns:repeat(4,1fr)}.empty-scan-controls{margin-bottom:0;padding-bottom:0;border-bottom:0}#startEmptyScan{width:auto}.grid-cards,.grid-cards.nine{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.grid-caption{align-items:flex-start;flex-direction:column;gap:4px;padding:7px}.review-view-tools{flex-wrap:wrap}.review-view-tools .nav{font-size:11px;gap:5px}}
+.grid-picture img{object-fit:contain}@media(min-width:761px){.grid-picture{height:var(--grid-preview-height,auto);aspect-ratio:auto}}
+</style>
+</head>
+<body>
+<header><div class="brand">Dataset review <span>Head / Body</span></div><div class="local">Local <button id="reload" class="small">Reload</button></div></header>
+<div class="layout">
+<aside id="reviewSidebar" aria-label="Review navigation"><nav class="sidebar-nav" role="tablist" aria-label="Sidebar sections"><button id="framesTab" type="button" role="tab" aria-controls="framesPanel" aria-selected="true" class="active">Frames</button><button id="recordingsTab" type="button" role="tab" aria-controls="recordingsPanel" aria-selected="false" tabindex="-1">Recordings</button></nav><section id="framesPanel" class="sidebar-panel" role="tabpanel" aria-labelledby="framesTab"><h2>Review progress</h2><div id="source" class="source muted">Loading recording…</div><div class="progress"><div id="progressBar"></div></div><div id="progressText" class="muted" style="font-size:11px">—</div><div class="counts"><div><strong id="pendingCount">0</strong><span>Pending</span></div><div><strong id="approvedCount">0</strong><span>Approved</span></div><div><strong id="rejectedCount">0</strong><span>Rejected</span></div><div><strong id="autoRemovedCount">0</strong><span>Auto removed</span></div></div><label for="filter" class="muted" style="font-size:11px">Frames</label><select id="filter" class="filter"><option value="pending">Pending</option><option value="all">All frames</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="auto_removed">Auto removed</option></select><section class="empty-scan-controls" aria-label="Empty frame scan"><button id="startEmptyScan" class="small" disabled title="Checks untouched, unboxed pending frames with the selected model family. Removed frames remain recoverable.">Scan empty frames</button><div id="emptyScanStatus" hidden><div class="scan-heading"><strong id="emptyScanTitle">Empty scan</strong><button id="cancelEmptyScan" class="small" hidden>Cancel</button></div><p id="emptyScanMessage"></p><div class="progress"><div id="emptyScanProgress"></div></div><div id="emptyScanCounts"></div><div id="emptyScanModel"></div></div><p id="emptyScanError" class="workbench-error" role="status" hidden></p></section><div id="frameList" class="frame-list"></div></section><section id="recordingsPanel" class="sidebar-panel" role="tabpanel" aria-labelledby="recordingsTab" hidden><div class="recordings-scroll"><p id="recordingUnavailable" class="help">Loading recordings…</p><section id="recordingBar" class="recording-bar" aria-label="Local recordings" hidden><label for="recordingSelect">Recording</label><select id="recordingSelect" size="9" disabled aria-label="Recordings"><option value="">Current recording</option></select><p id="recordingStatus" class="help">Loading recordings…</p><div id="recordingError" class="workbench-error" role="status" hidden></div></section><section id="preparationStatus" class="job-card" aria-label="Video preparation progress" hidden><div class="job-title"><strong id="preparationTitle">Preparing frames</strong><button id="openPreparedRecording" class="small" hidden>Open recording</button></div><p id="preparationMessage"></p><div class="progress"><div id="preparationProgress"></div></div><div id="preparationCounts" class="model-detail"></div><details><summary class="help">Details and log</summary><div id="preparationPath" class="model-detail"></div><pre id="preparationLog" class="job-log"></pre></details></section></div><div class="recording-footer"><button id="browseVideo" class="small" disabled>Browse video…</button><button id="openPreparation" class="small" disabled>Prepare frames…</button></div></section></aside>
+<main><div id="running" class="running" hidden>Preparing frames. Open this recording again when it finishes.</div><div class="heading"><div><h1 id="frameTitle">Loading frames</h1><div id="meta" class="meta"></div></div><div id="frameNavigation" class="nav"><span id="position" class="muted" style="font-size:12px"></span><button id="previous" title="Previous frame [←]" aria-label="Previous frame">←</button><button id="next" title="Next frame [→]" aria-label="Next frame">→</button></div></div>
+<section id="modelBar" class="model-bar" aria-label="Models and training"><div class="model-label"><label for="modelSelect">Model</label><select id="modelSelect" disabled><option value="">Loading models…</option></select><span id="activeModelBadge" class="pill" hidden>Default</span></div><button id="useModel" class="small" disabled>Use as default</button><button id="openTraining" class="small training-open" disabled>Train…</button><p id="workbenchStatus" class="help">Loading models…</p><div id="workbenchError" class="workbench-error" role="status" hidden></div></section>
+<section id="trainingStatus" class="job-card" aria-label="Training progress" hidden><div class="job-title"><strong id="jobTitle">Training</strong><button id="viewTraining" class="small">View options</button></div><p id="jobMessage"></p><div class="progress"><div id="jobProgress"></div></div><details><summary class="help">Details and log</summary><div id="jobPath" class="model-detail"></div><pre id="jobLog" class="job-log"></pre></details></section>
+<div class="review-view-tools"><label for="gridSize">View</label><select id="gridSize" aria-label="Frames per view"><option value="1">1 frame</option><option value="4">4 frames</option><option value="9">9 frames</option></select><div id="gridNavigation" class="nav" hidden><span id="gridPosition" class="muted"></span><button id="gridPrevious" aria-label="Previous grid page">←</button><button id="gridNext" aria-label="Next grid page">→</button></div></div><section id="gridView" aria-label="Frame contact sheet" hidden><div id="gridCards" class="grid-cards"></div></section><div id="editor" class="workspace"><section class="canvas-card"><div class="canvas-top"><button id="selectTool" class="active" title="Select, move, resize [V]">Select <kbd>V</kbd></button><button id="drawTool" title="Draw rectangle [D]">Draw <kbd>D</kbd></button><span class="divider"></span><button id="labelsToggle" aria-pressed="false" title="Show class names over the crop">Labels off</button><button id="undo" title="Undo [Ctrl+Z]">Undo</button><button id="delete" title="Delete selected box [Delete]">Delete</button><span id="dirty" class="dirty" hidden>Unsaved</span></div><div class="view-tools" aria-label="Image view controls"><button id="zoomOut" aria-label="Zoom out">−</button><output id="zoomLevel" aria-live="polite" aria-label="Image zoom">100%</output><button id="zoomIn" aria-label="Zoom in">+</button><button id="zoomReset" title="Fit the complete image">Fit</button><span class="divider"></span><button id="panTool" title="Drag to pan the enlarged image" aria-pressed="false">Pan</button></div><div class="canvas-stage"><canvas id="canvas" width="640" height="448" tabindex="0" aria-label="640 by 448 video crop. Wheel to zoom. Drag empty space, hold Space, or middle-drag to pan. Alt-click cycles overlapping boxes."></canvas></div><div class="canvas-bottom"><span>640 × 448</span><span id="canvasHint">Select a box</span></div><div class="proposal-tools"><button id="suggestBoxes" disabled>Suggest boxes</button><label for="proposalConfidence">Confidence <input id="proposalConfidence" type="number" min="0.05" max="0.95" step="0.05" value="0.25"></label><label><input id="proposalTiles" type="checkbox" checked> Small-object tiles</label><label class="assist-option"><input id="proposalAssist" type="checkbox" checked> Recover missing parts <small>Focused rescans and estimated partner boxes.</small></label></div><div id="proposalPreview" class="proposal-review" hidden><div class="proposal-tools proposal-preview"><span id="proposalSummary"></span><button id="applyProposals" class="small" title="Add model detections only. Review estimates individually below.">Merge unique boxes</button><button id="discardProposals" class="small">Discard preview</button></div><ul id="proposalWarnings" class="proposal-warnings" hidden></ul><p id="estimateHelp" class="estimate-help" hidden>Amber ? boxes are estimates. Review each before use.</p><div id="proposalEstimates" class="estimate-list" hidden></div></div></section>
+<section class="inspect"><div><h2>Add box</h2><div class="legend"><span class="swatch"></span>Head <span class="swatch body" style="margin-left:8px"></span>Body</div><div class="class-tools"><button id="headClass" class="active">Head <kbd>1</kbd></button><button id="bodyClass">Body <kbd>2</kbd></button></div><h2 id="boxCount">0 boxes</h2></div><div id="boxes" class="boxes"></div><div class="selected-controls"><label for="selectedClass" class="muted" style="font-size:11px">Selected box</label><select id="selectedClass" disabled><option value="0">Head</option><option value="1">Body</option></select><div id="coordinates" class="muted" style="font-size:11px">No box selected.</div></div><div id="flags" class="flags"></div></section></div>
+<div id="empty" class="empty" hidden><strong>No frames in this view</strong>Choose another filter to continue.</div>
+<div class="actions"><div class="actions-group"><button id="reject" class="danger">Reject frame</button><button id="save">Save pending</button></div><div class="actions-group"><button id="export" title="Export saved, approved frames from this recording">Export reviewed</button><button id="approve" class="primary">Approve & next</button></div></div><div id="exportHelp" class="help" hidden>Save changes before exporting. Only saved, approved frames are included.</div><div id="notice" class="notice" role="status" aria-live="polite" hidden></div><div id="exportResult" class="export-result"></div>
+</main></div>
+<dialog id="emptyDialog"><h2>Approve an empty frame?</h2><p>Check that no Head or Body is visible. This records a confirmed empty training example.</p><div class="actions-group"><button id="cancelEmpty">Keep reviewing</button><button id="confirmEmpty" class="primary">Approve empty frame</button></div></dialog>
+<dialog id="preparationDialog" class="prepare-dialog"><div class="dialog-title"><h2>Prepare a recording</h2><button id="closePreparation" class="small" aria-label="Close preparation options">Close</button></div><p>Sample a local video into draft frames.</p><div class="picked-video"><strong id="pickedVideoName">No video selected</strong><div id="pickedVideoPath" class="model-detail"></div><div id="pickedVideoMetadata" class="model-detail"></div></div><button id="browseAnotherVideo" class="small">Browse another video…</button><p id="preparationModel" class="prepare-model" title="Uses the detailed view of the selected model family when available."></p><form id="preparationForm"><div class="training-grid prepare-grid"><label for="prepareSampleFps">Samples per second<input id="prepareSampleFps" name="sample_fps" type="number" min="0.1" max="10" step="0.1" value="1" required></label><label for="prepareMaxImages">Maximum images<input id="prepareMaxImages" name="max_images" type="number" min="2" max="5000" value="600" required></label><label for="prepareConfidence">Confidence<input id="prepareConfidence" name="confidence" type="number" min="0.05" max="0.95" step="0.05" value="0.25" required></label></div><label class="training-toggle"><input id="prepareTiles" name="tiles" type="checkbox" checked><span>Use small-object tiles for distant heads</span></label><p>Draft frames require review and approval before training.</p><div id="preparationError" class="workbench-error" role="alert"></div><div class="actions-group"><button id="startPreparation" class="primary" type="submit">Prepare frames</button></div></form></dialog>
+<dialog id="trainingDialog" class="training-dialog"><div class="dialog-title"><h2>Train Head / Body</h2><button id="closeTraining" class="small" aria-label="Close training options">Close</button></div><p>Starts a PowerShell window with these settings. Add a local best.pt checkpoint to the application folder before training.</p><form id="trainingForm"><div class="training-grid"><label class="wide" for="trainCheckpoint">Starting checkpoint<select id="trainCheckpoint" name="checkpoint_id" required></select></label><label for="trainDevice">Device<select id="trainDevice" name="device" required></select></label><label for="trainEpochs">Epochs<input id="trainEpochs" name="epochs" type="number" min="1" max="1000" required></label><label for="trainBatch">Batch size<input id="trainBatch" name="batch" type="number" min="1" max="128" required></label><label for="trainImgsz">Image size<input id="trainImgsz" name="imgsz" type="number" min="64" max="1280" step="32" required></label><label for="trainWorkers">Data workers<input id="trainWorkers" name="workers" type="number" min="0" max="8" required></label><label for="trainThreads">CPU threads<input id="trainThreads" name="threads" type="number" min="1" max="32" required></label><label for="trainName">Run name<input id="trainName" name="name" pattern="[a-z0-9][a-z0-9_-]*" maxlength="48" required></label></div><label class="training-toggle"><input id="trainAutoActivate" name="auto_activate" type="checkbox" checked title="Applied after a successful export. Training continues if this tab closes."><span>Make the exported model the default</span></label><p id="trainingSourceNote" class="training-options-note">Training uses the currently selected recording. Save and approve corrections before starting; Start exports its saved, approved frames.</p><div id="trainingError" class="workbench-error" role="alert"></div><div class="actions-group"><button id="startTraining" class="primary" type="submit">Start in PowerShell</button></div></form></dialog>
+<div id="editingToast" class="editing-toast" role="status" aria-live="polite" hidden><div class="toast-heading"><strong>Editing tips</strong><button id="closeEditingToast" type="button" class="small" aria-label="Dismiss editing tips">Dismiss</button></div><p>Drag a box to move it or a handle to resize. Alt-click cycles overlapping boxes; Alt-drag moves the next candidate. Wheel zooms; drag empty space or hold Space to pan.</p></div>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const token = new URLSearchParams(location.search).get("token") || "";
+const canvas = $("canvas"), ctx = canvas.getContext("2d");
+const clone = value => JSON.parse(JSON.stringify(value));
+let manifest = null, currentId = null, frame = null, boxes = [], selected = -1;
+let tool = "select", drawClass = 0, history = [], drag = null, image = null, imageURL = null;
+let showLabels = false;
+let view = {scale:1, x:0, y:0}, spacePan = false;
+let busy = false, loadSequence = 0, dirty = false, currentFilter = "pending";
+let editVersion = 0, proposalSequence = 0, proposal = null, proposing = false;
+let workbench = null, workbenchLoading = false, workbenchAction = false, workbenchGeneration = 0, selectedModelId = "", trainingFormReady = false;
+let recordingLibrary=null, recordingLibraryLoading=false, recordingAction=false, recordingLibraryGeneration=0;
+let selectedRecordingId="", recordingSequence=0, manifestSequence=0, pickedVideo=null, preparationFormReady=false;
+let gridSize=1, gridPage=0, gridSequence=0, gridLoads=[];
+let emptyScan=null, emptyScanLoading=false, emptyScanAction=false, emptyScanSequence=0, emptyScanAvailable=true;
+let scanManifestPending=false, scanManifestLoading=false, scanMessage="";
+let frameRowGeneration=-1, frameRowCache=new Map(), frameRowsBusy=null, boxRows=[];
+const colors = ["#b2efbc", "#80b9fc"];
+const editingTipsKey="head-body-review:editing-tips:v1";
+let editingTipsShown=false, editingTipsTimer=null;
+function selectSidebarPanel(name) {
+  for(const value of ["frames","recordings"]) {
+    const active=value===name;
+    $(`${value}Panel`).hidden=!active; $(`${value}Tab`).classList.toggle("active",active);
+    $(`${value}Tab`).setAttribute("aria-selected",String(active)); $(`${value}Tab`).tabIndex=active?0:-1;
+  }
+}
+function dismissEditingTips() { $("editingToast").hidden=true; if(editingTipsTimer!==null) clearTimeout(editingTipsTimer); editingTipsTimer=null; }
+function showEditingTips() {
+  if(editingTipsShown) return; editingTipsShown=true;
+  try { if(localStorage.getItem(editingTipsKey)) return; localStorage.setItem(editingTipsKey,"1"); } catch(error) {  }
+  $("editingToast").hidden=false; editingTipsTimer=setTimeout(dismissEditingTips,15000);
+}
+function notice(message, error = false) { $("notice").textContent = message; $("notice").hidden=!message; $("notice").classList.toggle("error", error); }
+function setText(node,value) { const text=String(value); if(node.textContent!==text) node.textContent=text; }
+function reviewHeaders(recordingId=selectedRecordingId) {
+  const headers = {"X-Review-Token": token};
+  if(recordingId) headers["X-Review-Run"]=recordingId;
+  return headers;
+}
+async function api(path, payload, recordingId=selectedRecordingId) {
+  const headers=reviewHeaders(recordingId);
+  const options = {headers, cache:"no-store"};
+  if (payload !== undefined) { options.method = "POST"; headers["Content-Type"] = "application/json"; options.body = JSON.stringify(payload); }
+  const response = await fetch(path, options);
+  const data = await response.json();
+  if (!response.ok) { const error = new Error(data.error || "Local review request failed"); error.status = response.status; throw error; }
+  return data;
+}
+function visibleFrames() { return manifest ? manifest.frames.filter(item => currentFilter === "all" || item.status === currentFilter) : []; }
+function canEdit() { return gridSize===1 && !!frame && frame.status!=="auto_removed" && !!image && !busy && manifest?.status === "complete"; }
+function updateButtons() {
+  const editable = canEdit() && !drag;
+  for (const id of ["selectTool","drawTool","headClass","bodyClass","save","approve","reject"]) $(id).disabled = !editable;
+  if(gridSize===1 && frame?.status==="auto_removed") $("save").disabled=!image || busy || !!drag || manifest?.status!=="complete";
+  $("undo").disabled = !editable || !history.length;
+  $("delete").disabled = !editable || selected < 0;
+  $("selectedClass").disabled = !editable || selected < 0;
+  $("export").disabled = busy || dirty || !manifest || manifest.status !== "complete";
+  $("exportHelp").hidden = !dirty;
+  $("filter").disabled = busy; $("reload").disabled = busy;
+  const list = visibleFrames(), index = list.findIndex(item => item.id === currentId);
+  $("previous").disabled = busy || index <= 0; $("next").disabled = busy || index < 0 || index >= list.length - 1;
+  $("position").textContent = index < 0 ? "0 frames" : `${index + 1} / ${list.length}`;
+  $("dirty").hidden = !dirty;
+  $("save").textContent=frame?.status==="auto_removed"?"Restore":"Save pending";
+  for(const id of ["save","reject","approve"]) $(id).hidden=gridSize!==1;
+  $("gridSize").disabled=busy || !!drag;
+  $("frameNavigation").hidden=gridSize!==1;
+  updateViewControls();
+  updateWorkbenchControls();
+  updateRecordingControls();
+  updateEmptyScanControls();
+  updateFrameRowDisabled();
+}
+function updateViewControls() {
+  $("zoomLevel").textContent = `${Math.round(view.scale*100)}%`;
+  $("zoomIn").disabled = !image || busy || view.scale >= 8;
+  $("zoomOut").disabled = !image || busy || view.scale <= 1;
+  $("zoomReset").disabled = !image || busy || view.scale === 1;
+  $("panTool").disabled = !image || busy || view.scale <= 1;
+}
+function clampView() {
+  view.x=Math.min(0,Math.max(640*(1-view.scale),view.x));
+  view.y=Math.min(0,Math.max(448*(1-view.scale),view.y));
+}
+function canvasPoint(event) {
+  const rect=canvas.getBoundingClientRect();
+  return {x:(event.clientX-rect.left)*640/rect.width, y:(event.clientY-rect.top)*448/rect.height};
+}
+function zoomTo(value, anchor={x:320,y:224}) {
+  if(!image || busy || drag) return;
+  const scale=Math.min(8,Math.max(1,value));
+  if(!Number.isFinite(scale) || scale===view.scale) return;
+  const x=(anchor.x-view.x)/view.scale, y=(anchor.y-view.y)/view.scale;
+  view={scale,x:anchor.x-x*scale,y:anchor.y-y*scale};
+  clampView(); draw(); updateViewControls();
+}
+function fitImage() {
+  if(!image || busy || drag) return;
+  view={scale:1,x:0,y:0}; draw(); updateViewControls();
+}
+function updateCursor() {
+  canvas.style.cursor=drag?.kind==='pan'?'grabbing':(spacePan||tool==='pan')?'grab':tool==='draw'?'crosshair':'default';
+}
+function refreshProgress() {
+  const counts = {pending:0, approved:0, rejected:0,auto_removed:0};
+  manifest.frames.forEach(item => { if(item.status in counts) counts[item.status]++; });
+  for (const status of Object.keys(counts)) setText($(status==="auto_removed"?"autoRemovedCount":`${status}Count`),counts[status]);
+  const total = manifest.frames.length, reviewed = counts.approved + counts.rejected;
+  const progress=`${total ? reviewed / total * 100 : 0}%`; if($("progressBar").style.width!==progress) $("progressBar").style.width=progress;
+  setText($("progressText"),`${reviewed} of ${total} frames reviewed`);
+  const source = manifest.source?.path || "Local video";
+  setText($("source"),source.split(/[\\/]/).pop()); if($("source").title!==source) $("source").title=source;
+  $("running").hidden = manifest.status !== "running";
+  renderFrameList(); renderGrid(); updateButtons();
+}
+function renderFrameList() {
+  const container=$("frameList"), items=visibleFrames();
+  if(frameRowGeneration!==recordingSequence) { frameRowGeneration=recordingSequence; frameRowCache.clear(); container.replaceChildren(); }
+  const wanted=new Set(items.map(item=>item.id));
+  for(const child of [...container.children]) if(!wanted.has(child.dataset.frameId)) child.remove();
+  let cursor=container.firstElementChild; const tail=document.createDocumentFragment();
+  for (const item of items) {
+    let row=frameRowCache.get(item.id);
+    if(!row) {
+      const button=document.createElement("button"), label=document.createElement("span"), sub=document.createElement("div"), mark=document.createElement("span");
+      label.append(document.createTextNode(item.id),sub); sub.className="secondary"; mark.className="mark"; button.dataset.frameId=item.id;
+      button.append(label,mark); button.onclick=()=>navigate(item.id);
+      row={button,sub,mark,status:null,current:null}; frameRowCache.set(item.id,row);
+    }
+    if(row.status!==item.status) {
+      row.status=item.status; row.button.className=`frame-item ${item.status}`; row.current=null;
+      row.mark.textContent=item.status==="approved"?"✓":item.status==="rejected"?"×":item.status==="auto_removed"?"−":"○";
+      row.button.title=item.status==="auto_removed"?"Auto removed · open to review or restore":"";
+    }
+    const current=item.id===currentId;
+    if(row.current!==current) { row.button.classList.toggle("current",current); row.current=current; }
+    setText(row.sub,`${formatTime(item.time_seconds)} · ${item.split}`);
+    if(row.button.disabled!==busy) row.button.disabled=busy;
+    if(row.button===cursor) cursor=cursor.nextElementSibling;
+    else if(cursor) container.insertBefore(row.button,cursor);
+    else tail.append(row.button);
+  }
+  if(tail.childNodes.length) container.append(tail);
+  frameRowsBusy=busy;
+}
+function updateFrameRowDisabled() {
+  if(frameRowsBusy===busy) return;
+  for(const button of $("frameList").children) if(button.disabled!==busy) button.disabled=busy;
+  frameRowsBusy=busy;
+}
+function formatTime(value) { return Number.isFinite(value) ? `${Math.floor(value / 60)}:${(value % 60).toFixed(2).padStart(5,"0")}` : "Unknown time"; }
+function statusLabel(status) { return status==="auto_removed"?"Auto removed":status[0].toUpperCase()+status.slice(1); }
+function clearGridImages() {
+  gridSequence++;
+  for(const item of gridLoads) { item.controller.abort(); if(item.url) URL.revokeObjectURL(item.url); }
+  gridLoads=[];
+}
+function fitGridToViewport() {
+  const container=$("gridCards");
+  if(gridSize===1 || innerWidth<=760 || !container.children.length) { container.style.removeProperty("--grid-preview-height"); return; }
+  const rows=Math.ceil(container.children.length/(gridSize===9?3:2)), caption=container.firstElementChild.querySelector(".grid-caption");
+  const top=container.getBoundingClientRect().top+scrollY, gap=parseFloat(getComputedStyle(container).rowGap)||0;
+  const available=innerHeight-top-16;
+  const height=Math.max(64,Math.floor((available-gap*(rows-1))/rows-caption.getBoundingClientRect().height-2));
+  container.style.setProperty("--grid-preview-height",`${height}px`);
+}
+function renderGrid() {
+  clearGridImages(); $("gridCards").replaceChildren();
+  const list=visibleFrames(), active=gridSize!==1;
+  $("gridView").hidden=!active || !list.length; $("gridNavigation").hidden=!active;
+  if(!active) return;
+  gridPage=Math.min(Math.max(0,gridPage),Math.max(0,Math.ceil(list.length/gridSize)-1));
+  const start=gridPage*gridSize, items=list.slice(start,start+gridSize), sequence=gridSequence, generation=recordingSequence, recordingId=selectedRecordingId;
+  $("gridPosition").textContent=items.length?`${start+1}–${start+items.length} / ${list.length}`:"0 frames";
+  $("gridPrevious").disabled=busy || gridPage===0; $("gridNext").disabled=busy || start+gridSize>=list.length;
+  $("gridCards").classList.toggle("nine",gridSize===9);
+  for(const item of items) {
+    const card=document.createElement("button"); card.type="button"; card.className=`grid-card ${item.status}`; card.dataset.frameId=item.id;
+    card.setAttribute("aria-label",`${item.id}, ${statusLabel(item.status)}. Open frame`); card.onclick=()=>navigate(item.id);
+    const picture=document.createElement("div"); picture.className="grid-picture";
+    const loading=document.createElement("span"); loading.className="grid-loading"; loading.textContent="Loading…";
+    const img=document.createElement("img"); img.alt="";
+    const overlay=document.createElementNS("http://www.w3.org/2000/svg","svg"); overlay.setAttribute("viewBox","0 0 640 448"); overlay.setAttribute("aria-hidden","true");
+    for(const box of item.boxes||[]) {
+      if(![box.x1,box.y1,box.x2,box.y2].every(Number.isFinite)) continue;
+      const rect=document.createElementNS("http://www.w3.org/2000/svg","rect");
+      for(const [name,value] of Object.entries({x:box.x1*640,y:box.y1*448,width:(box.x2-box.x1)*640,height:(box.y2-box.y1)*448,stroke:colors[box.class_id]||colors[0],fill:"none","stroke-width":1.5,"vector-effect":"non-scaling-stroke"})) rect.setAttribute(name,String(value));
+      overlay.append(rect);
+    }
+    picture.append(img,overlay,loading);
+    const caption=document.createElement("div"); caption.className="grid-caption"; const label=document.createElement("strong"),status=document.createElement("span");
+    label.textContent=item.id; status.className=`pill ${item.status}`; status.textContent=statusLabel(item.status); caption.append(label,status);card.append(picture,caption); $("gridCards").append(card);
+    const load={controller:new AbortController(),url:null}; gridLoads.push(load);
+    (async()=>{
+      try {
+        const response=await fetch(`/image/${encodeURIComponent(item.id)}`,{headers:reviewHeaders(recordingId),cache:"no-store",signal:load.controller.signal});
+        if(!response.ok) throw new Error("Image unavailable");
+        const blob=await response.blob(); if(sequence!==gridSequence || generation!==recordingSequence) return;
+        load.url=URL.createObjectURL(blob); img.src=load.url; await img.decode();
+        if(sequence!==gridSequence || generation!==recordingSequence) return;
+        if(img.naturalWidth!==640 || img.naturalHeight!==448) throw new Error("Invalid crop size");
+        card.dataset.loaded="true";
+      } catch(error) { if(sequence===gridSequence && generation===recordingSequence && error.name!=="AbortError") { card.dataset.error="true"; loading.textContent=error.message || "Image unavailable"; } }
+    })();
+  }
+  fitGridToViewport();
+}
+async function changeGridSize(value) {
+  if(busy || drag || !discardOkay()) { $("gridSize").value=String(gridSize); return; }
+  const index=visibleFrames().findIndex(item=>item.id===currentId);
+  const target=value===1?visibleFrames()[gridPage*gridSize]?.id:currentId;
+  gridSize=value; gridPage=value===1?0:Math.floor(Math.max(0,index)/value); $("gridSize").value=String(value);
+  await showFrame(target);
+}
+function setDirty(keepProposal=false) { dirty = !!frame && JSON.stringify(boxes) !== JSON.stringify(frame.boxes); editVersion++; if(keepProposal && proposal) proposal.version=editVersion; else clearProposals(); updateButtons(); }
+function pushHistory(keepProposal=false) { history.push({boxes:clone(boxes), selected, proposal:keepProposal && proposal?clone(proposal):null}); if (history.length > 80) history.shift(); }
+function selectBox(index) { selected = index; renderBoxes(); draw(); updateButtons(); }
+function renderBoxes() {
+  setText($("boxCount"),`${boxes.length} ${boxes.length === 1 ? "box" : "boxes"}`);
+  while(boxRows.length>boxes.length) boxRows.pop().button.remove();
+  const added=document.createDocumentFragment();
+  boxes.forEach((box, index) => {
+    let row=boxRows[index];
+    if(!row) { const button=document.createElement("button"),label=document.createElement("span"),score=document.createElement("small"); button.className="box-row"; button.append(label,score); button.onclick=()=>selectBox(index); row={button,label,score,selected:null,classId:null}; boxRows.push(row); added.append(button); }
+    if(row.selected!==(selected===index)) { row.selected=selected===index; row.button.classList.toggle("selected",row.selected); }
+    setText(row.label,`${index+1} · ${box.class_id===0?"Head":"Body"}`);
+    if(row.classId!==box.class_id) { row.classId=box.class_id; row.label.style.color=colors[box.class_id]; }
+    setText(row.score,Number.isFinite(box.score)?`${Math.round(box.score*100)}% draft`:"edited");
+  });
+  if(added.childNodes.length) $("boxes").append(added);
+  if (selected >= 0 && boxes[selected]) {
+    const box = boxes[selected]; $("selectedClass").value = String(box.class_id);
+    setText($("coordinates"),`${Math.round(box.x1 * 640)}, ${Math.round(box.y1 * 448)} → ${Math.round(box.x2 * 640)}, ${Math.round(box.y2 * 448)} px`);
+  } else setText($("coordinates"),"No box selected.");
+  updateButtons();
+}
+function setTool(value) { tool = value; $("selectTool").classList.toggle("active", value === "select"); $("drawTool").classList.toggle("active", value === "draw"); $("panTool").classList.toggle("active",value==='pan'); $("panTool").setAttribute('aria-pressed',String(value==='pan')); updateCursor(); $("canvasHint").textContent = value === "draw" ? `Draw ${drawClass === 0 ? "Head" : "Body"}` : value==='pan'?'Pan image':"Select a box"; }
+function setClass(value) { drawClass = value; $("headClass").classList.toggle("active", value === 0); $("bodyClass").classList.toggle("active", value === 1); setTool("draw"); }
+function handles(box) { const mx = (box.x1 + box.x2) / 2, my = (box.y1 + box.y2) / 2; return [[box.x1,box.y1,"nw"],[mx,box.y1,"n"],[box.x2,box.y1,"ne"],[box.x2,my,"e"],[box.x2,box.y2,"se"],[mx,box.y2,"s"],[box.x1,box.y2,"sw"],[box.x1,my,"w"]]; }
+function paintBox(box, index, preview = false) {
+  const x = box.x1 * 640, y = box.y1 * 448, w = (box.x2 - box.x1) * 640, h = (box.y2 - box.y1) * 448;
+  const unit=1/view.scale;
+  ctx.strokeStyle = colors[box.class_id]; ctx.lineWidth = (selected === index ? 2 : 1.3)*unit;
+  ctx.fillStyle = box.class_id === 0 ? "#b2efbc16" : "#80b9fc12"; ctx.fillRect(x,y,w,h);
+  if (preview) ctx.setLineDash([4*unit,3*unit]); ctx.strokeRect(x,y,w,h); ctx.setLineDash([]);
+  if (showLabels) {
+    const label = `${index + 1} ${box.class_id === 0 ? "Head" : "Body"}`; ctx.font = `${11*unit}px system-ui`;
+    const labelWidth = ctx.measureText(label).width + 8*unit, labelY = y >= 17*unit ? y - 17*unit : y;
+    const labelX = Math.min(x, 640-labelWidth); ctx.fillStyle = colors[box.class_id]; ctx.fillRect(labelX,labelY,labelWidth,16*unit); ctx.fillStyle = "#102018"; ctx.fillText(label,labelX+4*unit,labelY+12*unit);
+  }
+  if (selected === index && !preview) handles(box).forEach(([hx,hy]) => { ctx.fillStyle = colors[box.class_id]; ctx.fillRect(hx*640-3*unit,hy*448-3*unit,6*unit,6*unit); ctx.strokeStyle = "#14221b"; ctx.lineWidth=unit; ctx.strokeRect(hx*640-3*unit,hy*448-3*unit,6*unit,6*unit); });
+}
+function paintEstimate(box) {
+  const unit=1/view.scale, x=box.x1*640, y=box.y1*448, w=(box.x2-box.x1)*640, h=(box.y2-box.y1)*448;
+  ctx.save(); ctx.strokeStyle="#edc376"; ctx.fillStyle="#edc37612"; ctx.lineWidth=1.8*unit;
+  ctx.setLineDash([6*unit,4*unit]); ctx.fillRect(x,y,w,h); ctx.strokeRect(x,y,w,h); ctx.setLineDash([]);
+  const tagY=y>=17*unit?y-17*unit:y, tagX=Math.min(640-17*unit,Math.max(0,x));
+  ctx.fillStyle="#edc376"; ctx.fillRect(tagX,tagY,17*unit,17*unit); ctx.fillStyle="#211c12"; ctx.font=`bold ${12*unit}px system-ui`; ctx.fillText("?",tagX+5*unit,tagY+13*unit); ctx.restore();
+}
+function draw() {
+  ctx.clearRect(0,0,640,448);
+  ctx.save(); ctx.translate(view.x,view.y); ctx.scale(view.scale,view.scale);
+  ctx.imageSmoothingEnabled=false;
+  if (image) ctx.drawImage(image,0,0,640,448);
+  boxes.forEach((box,index) => paintBox(box,index));
+  if(proposal) proposal.boxes.forEach(box => paintBox(box,-2,true));
+  if(proposal) proposal.estimates.forEach(paintEstimate);
+  if (drag?.kind === "draw") { const p = drag.latest; paintBox({class_id:drawClass,x1:Math.min(drag.start.x,p.x),y1:Math.min(drag.start.y,p.y),x2:Math.max(drag.start.x,p.x),y2:Math.max(drag.start.y,p.y)},boxes.length,true); }
+  ctx.restore();
+}
+function discardOkay() { return !dirty || window.confirm("Discard unsaved box corrections for this frame?"); }
+async function navigate(id) { if (busy || (id === currentId && gridSize===1) || !discardOkay()) return; gridSize=1; $("gridSize").value="1"; await showFrame(id); }
+async function showFrame(id) {
+  const sequence = ++loadSequence;
+  const recordingGeneration=recordingSequence, recordingId=selectedRecordingId;
+  clearProposals(); editVersion++;
+  if(id!==currentId) view={scale:1,x:0,y:0};
+  frame = manifest.frames.find(item => item.id === id) || null; currentId = frame?.id || null;
+  boxes = frame ? clone(frame.boxes) : []; selected=-1; history=[]; dirty=false; image=null; drag=null;
+  if (imageURL) { URL.revokeObjectURL(imageURL); imageURL=null; }
+  $("editor").hidden = !frame || gridSize!==1; $("empty").hidden = !!visibleFrames().length; $("frameTitle").textContent = gridSize!==1?"Frames":frame?.id || "Review queue complete"; $("meta").replaceChildren(); $("flags").textContent="";
+  $("meta").hidden=gridSize!==1;
+  if (frame) {
+    for (const [text, className] of [[frame.status==="auto_removed"?"Auto removed":frame.status,`pill ${frame.status}`],[formatTime(frame.time_seconds),""],[`${frame.split} split`,"pill"],[`revision ${frame.revision}`,""]]) { const span=document.createElement("span"); span.textContent=text; span.className=className; $("meta").append(span); }
+    const flags = Array.isArray(frame.flags) ? frame.flags : [];
+    $("flags").textContent = flags.length ? `Review: ${flags.map(flag=>String(flag).replaceAll("_"," ")).join(" · ")}` : ""; $("flags").hidden=!flags.length;
+  }
+  renderBoxes(); refreshProgress(); draw();
+  if (!frame || gridSize!==1) return;
+  try {
+    const response = await fetch(`/image/${encodeURIComponent(frame.id)}`,{headers:reviewHeaders(recordingId),cache:"no-store"});
+    if (!response.ok) throw new Error("Could not load this local crop");
+    const url = URL.createObjectURL(await response.blob()); const loaded = new Image(); loaded.src=url; await loaded.decode();
+    if (sequence !== loadSequence || recordingGeneration!==recordingSequence) { URL.revokeObjectURL(url); return; }
+    if (loaded.naturalWidth !== 640 || loaded.naturalHeight !== 448) { URL.revokeObjectURL(url); throw new Error("Crop dimensions must be 640 × 448"); }
+    imageURL=url; image=loaded; draw(); updateButtons();
+  } catch(error) { if(sequence === loadSequence && recordingGeneration===recordingSequence) notice(error.message,true); }
+}
+async function loadManifest() {
+  if (busy || !discardOkay()) return;
+  const generation=recordingSequence, recordingId=selectedRecordingId, request=++manifestSequence;
+  const current=()=>generation===recordingSequence && request===manifestSequence;
+  busy=true; updateButtons();
+  try {
+    const loaded=await api("/api/manifest",undefined,recordingId); if(!current()) return;
+    manifest=loaded; scanManifestPending=false; const visible=visibleFrames(); const next=visible.find(item=>item.id===currentId) || visible[0];
+    notice("");
+    busy=false; await showFrame(next?.id); if(!current()) return;
+  } catch(error) { if(current()) notice(error.message,true); }
+  finally { if(current()) { busy=false; updateButtons(); } }
+}
+async function saveFrame(status, emptyConfirmed=false, advance=false) {
+  const restoring=frame?.status==="auto_removed" && status==="pending" && gridSize===1 && !!image && !busy && !drag && manifest?.status==="complete";
+  if(!canEdit() && !restoring) return;
+  const generation=recordingSequence, recordingId=selectedRecordingId, frameId=frame.id;
+  const previousList=visibleFrames(), previousIndex=previousList.findIndex(item=>item.id===currentId);
+  busy=true; updateButtons();
+  try {
+    const updated=await api(`/api/frame/${encodeURIComponent(frameId)}`,{revision:frame.revision,boxes:restoring?[]:clone(boxes),status,empty_confirmed:restoring?false:emptyConfirmed},recordingId);
+    if(generation!==recordingSequence) return;
+    manifest.frames[manifest.frames.findIndex(item=>item.id===updated.id)]=updated; dirty=false;
+    const list=visibleFrames(); let target=updated.id;
+    if(!list.some(item=>item.id===target)) target=list[Math.min(previousIndex,list.length-1)]?.id;
+    else if(advance) target=list[Math.min(list.findIndex(item=>item.id===target)+1,list.length-1)]?.id;
+    busy=false; await showFrame(target); if(generation!==recordingSequence) return;
+    notice(restoring?"Frame restored to pending.":status === "approved" ? "Frame approved." : status === "rejected" ? "Frame rejected." : "Saved as pending.");
+  } catch(error) { if(generation===recordingSequence) { notice(error.message,true); if(error.status===409) notice(`${error.message} Unsaved changes kept. Reload to review the newer revision.`,true); } }
+  finally { if(generation===recordingSequence) { busy=false; refreshProgress(); if(scanManifestPending) await refreshScanManifest(); } }
+}
+function emptyScanActive() { return ["queued","running"].includes(emptyScan?.state); }
+function updateEmptyScanControls() {
+  const knownModel=workbench?.models?.some(item=>item.id===selectedModelId);
+  $("startEmptyScan").disabled=!emptyScanAvailable || !knownModel || dirty || busy || !!drag || emptyScanAction || emptyScanActive() || !manifest?.frames?.length || manifest.status!=="complete";
+  $("startEmptyScan").title=!emptyScanAvailable?"Empty scan unavailable on this server.":dirty?"Save corrections before scanning.":"Checks untouched, unboxed pending frames with the selected model family. Removed frames remain recoverable.";
+  $("emptyScanStatus").hidden=!emptyScan;
+  $("emptyScanError").hidden=!scanMessage; $("emptyScanError").textContent=scanMessage;
+  if(!emptyScan) return;
+  $("emptyScanTitle").textContent=`Scan ${emptyScan.state}`;
+  $("emptyScanMessage").textContent=(emptyScan.message||"")+(scanManifestPending && dirty?" Save or reload to refresh frame statuses.":"");
+  const processed=Number(emptyScan.processed)||0,total=Number(emptyScan.total)||0;
+  $("emptyScanProgress").style.width=`${total?Math.min(100,Math.max(0,processed/total*100)):0}%`;
+  $("emptyScanCounts").textContent=`${processed} / ${total} checked · ${Number(emptyScan.removed)||0} removed · ${Number(emptyScan.kept)||0} kept · ${Number(emptyScan.skipped)||0} skipped`;
+  $("emptyScanModel").textContent=emptyScan.model_label || emptyScan.model_id || "";
+  $("cancelEmptyScan").hidden=!emptyScanActive(); $("cancelEmptyScan").disabled=emptyScanAction;
+}
+function resetEmptyScan() {
+  emptyScanSequence++; emptyScanLoading=false; emptyScanAction=false; emptyScan=null; scanManifestPending=false; scanManifestLoading=false; scanMessage=""; emptyScanAvailable=true;
+  updateEmptyScanControls();
+}
+async function refreshScanManifest() {
+  if(!scanManifestPending || scanManifestLoading || dirty || drag || busy || !manifest) { updateEmptyScanControls(); return; }
+  scanManifestLoading=true;
+  const generation=recordingSequence, recordingId=selectedRecordingId, version=editVersion, request=++manifestSequence;
+  try {
+    const loaded=await api("/api/manifest",undefined,recordingId);
+    if(generation!==recordingSequence || request!==manifestSequence) return;
+    if(dirty || drag || busy || version!==editVersion) return;
+    const before=frame; manifest=loaded; scanManifestPending=false;
+    const list=visibleFrames(), next=list.find(item=>item.id===currentId) || list[0];
+    if(!next || !before || JSON.stringify(next)!==JSON.stringify(before)) await showFrame(next?.id);
+    else { frame=next; refreshProgress(); }
+  } catch(error) { if(generation===recordingSequence && request===manifestSequence) scanMessage=`Could not refresh scan results: ${error.message}`; }
+  finally { if(generation===recordingSequence) { scanManifestLoading=false; updateEmptyScanControls(); } }
+}
+async function refreshEmptyScan() {
+  if(emptyScanLoading || emptyScanAction) return;
+  const generation=recordingSequence, recordingId=selectedRecordingId, request=++emptyScanSequence;
+  emptyScanLoading=true;
+  try {
+    const result=await api("/api/empty-scan",undefined,recordingId);
+    if(generation!==recordingSequence || request!==emptyScanSequence) return;
+    const changed=JSON.stringify(result)!==JSON.stringify(emptyScan);
+    emptyScan=result; emptyScanAvailable=true; scanMessage="";
+    if(result && changed) scanManifestPending=true;
+    await refreshScanManifest();
+  } catch(error) {
+    if(generation===recordingSequence && request===emptyScanSequence) { if(error.status===404) emptyScanAvailable=false; else scanMessage=error.message; }
+  } finally { if(generation===recordingSequence && request===emptyScanSequence) { emptyScanLoading=false; updateEmptyScanControls(); } }
+}
+async function emptyScanCommand(path) {
+  if(emptyScanAction || (path.endsWith("/start") && $("startEmptyScan").disabled)) return;
+  const generation=recordingSequence,recordingId=selectedRecordingId; emptyScanSequence++; emptyScanLoading=false; emptyScanAction=true; scanMessage=""; updateEmptyScanControls();
+  try {
+    const result=await api(path,path.endsWith("/start")?{model_id:selectedModelId}:{},recordingId);
+    if(generation!==recordingSequence) return;
+    emptyScan=result; scanManifestPending=true; await refreshScanManifest();
+  } catch(error) { if(generation===recordingSequence) scanMessage=error.message; }
+  finally { if(generation===recordingSequence) { emptyScanAction=false; updateEmptyScanControls(); } }
+}
+function recordingError(message="") { $("recordingError").textContent=message; $("recordingError").hidden=!message; }
+function preparationActive() { return ["queued","running"].includes(recordingLibrary?.preparation?.state); }
+function updateRecordingControls() {
+  const ready=!!recordingLibrary, available=ready && !recordingAction;
+  $("recordingUnavailable").hidden=ready;
+  if(!ready) $("recordingUnavailable").textContent=$("recordingStatus").textContent;
+  $("recordingSelect").disabled=!ready || !!drag;
+  $("browseVideo").disabled=!available; $("browseAnotherVideo").disabled=!available;
+  $("browseVideo").textContent=recordingAction?"Working…":"Browse video…";
+  $("openPreparation").disabled=!available || !pickedVideo;
+  $("startPreparation").disabled=!available || !pickedVideo || !selectedModelId || preparationActive();
+  const model=workbench?.models?.find(item=>item.id===selectedModelId);
+  $("preparationModel").textContent=model?`Model: ${model.label}`:"Select a model before preparing frames.";
+  const currentRecording=(recordingLibrary?.recordings||[]).find(item=>item.id===selectedRecordingId);
+  const source=currentRecording?.label || currentRecording?.source_name || manifest?.source?.path?.split(/[\\/]/).pop() || "the currently selected recording";
+  $("trainingSourceNote").textContent=`Trains only on saved, approved frames from ${source}.`;
+  const job=recordingLibrary?.preparation, completed=job?.state==="completed" && !!job.recording_id;
+  $("openPreparedRecording").hidden=!completed;
+  $("openPreparedRecording").disabled=!completed || !(recordingLibrary?.recordings||[]).some(item=>item.id===job.recording_id) || !!drag;
+}
+function renderRecordings() {
+  if(drag) return;
+  $("recordingBar").hidden=false;
+  const recordings=recordingLibrary.recordings||[];
+  if(!selectedRecordingId && recordingLibrary.default_recording_id) selectedRecordingId=recordingLibrary.default_recording_id;
+  const choices=recordings.map(item=>({id:item.id,label:`${item.label || item.source_name || item.id} · ${item.frames || 0} frames${item.status==="running"?" · preparing":["failed","interrupted"].includes(item.status)?` · ${item.status}`:""}`,disabled:!["running","complete"].includes(item.status)}));
+  if(!choices.some(item=>item.id===selectedRecordingId)) choices.unshift({id:selectedRecordingId,label:!selectedRecordingId && !recordings.length?"No recordings":"Current recording · unavailable in library",disabled:true});
+  const control=$("recordingSelect"), existing=[...control.options].map(option=>({id:option.value,label:option.textContent,disabled:option.disabled}));
+  if(JSON.stringify(choices)!==JSON.stringify(existing)) {
+    control.replaceChildren(); for(const item of choices) { const option=document.createElement("option"); option.value=item.id; option.textContent=item.label; option.disabled=item.disabled; control.append(option); }
+  }
+  control.value=selectedRecordingId;
+  const selectedRecording=recordings.find(item=>item.id===selectedRecordingId);
+  $("recordingStatus").textContent=selectedRecording?(selectedRecording.source_name || selectedRecording.label):"No recordings available.";
+  $("recordingStatus").title=selectedRecording?.path || ""; $("recordingSelect").title=selectedRecording?.path || "";
+  const job=recordingLibrary.preparation; $("preparationStatus").hidden=!job;
+  if(job) {
+    $("preparationStatus").classList.toggle("failed",["failed","interrupted"].includes(job.state));
+    $("preparationTitle").textContent=`Preparation ${job.state}`;
+    $("preparationMessage").textContent=job.message || "Waiting for worker…";
+    $("preparationProgress").style.width=`${Math.min(100,Math.max(0,Number(job.progress)||0))}%`;
+    const processed=Number.isFinite(job.processed)?job.processed:0, total=Number.isFinite(job.total)?job.total:null;
+    $("preparationCounts").textContent=`${processed}${total!==null?` / ${total}`:""} samples · ${Number.isFinite(job.saved)?job.saved:0} frames saved`;
+    $("preparationPath").textContent=job.run_path || "";
+    $("preparationLog").textContent=Array.isArray(job.log_tail)?job.log_tail.join("\n"):String(job.log_tail||"No log output yet.");
+  }
+  if(!preparationFormReady) {
+    const defaults={sample_fps:1,max_images:600,confidence:.25,tiles:true,...recordingLibrary.options?.defaults};
+    $("prepareSampleFps").value=defaults.sample_fps; $("prepareMaxImages").value=defaults.max_images; $("prepareConfidence").value=defaults.confidence; $("prepareTiles").checked=defaults.tiles!==false; preparationFormReady=true;
+  }
+  updateRecordingControls();
+}
+async function refreshRecordings() {
+  if(recordingLibraryLoading || recordingAction) return;
+  recordingLibraryLoading=true; const generation=recordingLibraryGeneration;
+  try { const result=await api("/api/recordings"); if(generation===recordingLibraryGeneration) { recordingLibrary=result; renderRecordings(); } }
+  catch(error) { if(!recordingLibrary) $("recordingStatus").textContent=error.status===404?"Recording library unavailable on this server.":`Recording library unavailable: ${error.message}`; }
+  finally { recordingLibraryLoading=false; updateRecordingControls(); }
+}
+async function openRecording(id) {
+  if(drag || !(recordingLibrary?.recordings||[]).some(item=>item.id===id && ["running","complete"].includes(item.status))) { $("recordingSelect").value=selectedRecordingId; return; }
+  if(id===selectedRecordingId) { await loadManifest(); return; }
+  if(!discardOkay()) { $("recordingSelect").value=selectedRecordingId; return; }
+  selectedRecordingId=id; recordingSequence++; manifestSequence++; busy=false;
+  clearGridImages(); gridPage=0; resetEmptyScan();
+  view={scale:1,x:0,y:0}; manifest={status:"loading",frames:[]};
+  $("exportResult").textContent=""; $("emptyDialog").close();
+  await showFrame(undefined); $("frameTitle").textContent="Loading recording…";
+  renderRecordings(); await loadManifest(); refreshEmptyScan();
+}
+function openPreparation() {
+  if(!pickedVideo || !recordingLibrary) return;
+  $("preparationError").textContent=""; updateRecordingControls();
+  if(!$("preparationDialog").open) $("preparationDialog").showModal();
+}
+function renderPickedVideo() {
+  $("pickedVideoName").textContent=pickedVideo?.name || "Selected local video";
+  $("pickedVideoPath").textContent=pickedVideo?.path || "";
+  const info=pickedVideo?.metadata || {}, details=[];
+  if(Number.isFinite(info.width) && Number.isFinite(info.height)) details.push(`${info.width} × ${info.height}`);
+  if(Number.isFinite(info.fps)) details.push(`${Number(info.fps.toFixed(2))} fps`);
+  const duration=info.duration_seconds ?? info.duration;
+  if(Number.isFinite(duration)) details.push(`${Math.floor(duration/60)}:${Math.floor(duration%60).toString().padStart(2,"0")}`);
+  $("pickedVideoMetadata").textContent=details.join(" · ");
+}
+async function browseVideo() {
+  if(!recordingLibrary || recordingAction) return;
+  recordingAction=true; recordingLibraryGeneration++; recordingError(); $("preparationError").textContent=""; updateRecordingControls();
+  try {
+    const result=await api("/api/recordings/browse",{});
+    if(result.cancelled) return;
+    if(!result.selection_id) throw new Error("No video returned. Browse again.");
+    pickedVideo=result; renderPickedVideo(); openPreparation();
+  } catch(error) { recordingError(error.message); if($("preparationDialog").open) $("preparationError").textContent=error.message; }
+  finally { recordingAction=false; updateRecordingControls(); }
+}
+function workbenchError(message="") { $("workbenchError").textContent=message; $("workbenchError").hidden=!message; }
+function trainingActive() { return ["queued","running","exporting"].includes(workbench?.training?.state); }
+function updateWorkbenchControls() {
+  const ready=!!workbench && !workbenchAction, model=workbench?.models?.find(item=>item.id===selectedModelId);
+  $("modelSelect").disabled=!ready || !workbench.models.length;
+  $("useModel").disabled=!ready || !model || model.id===workbench.active_model_id;
+  $("openTraining").disabled=!ready;
+  $("startTraining").disabled=!ready || trainingActive();
+  $("suggestBoxes").disabled=!ready || !model || !canEdit() || proposing || !!drag;
+  $("suggestBoxes").textContent=proposing?"Finding boxes…":"Suggest boxes";
+  $("activeModelBadge").hidden=!model || model.id!==workbench?.active_model_id;
+  const previewEditable=proposal && proposalContextMatches(proposal) && canEdit() && !drag && frame.status!=="approved";
+  $("applyProposals").disabled=!previewEditable || !proposal.boxes.length;
+  for(const button of $("proposalEstimates").querySelectorAll(".estimate-use")) button.disabled=!previewEditable;
+  updateRecordingControls();
+  updateEmptyScanControls();
+}
+function setupTrainingForm(options) {
+  const defaults={epochs:30,batch:4,imgsz:320,workers:0,threads:2,device:"cpu",name:"train-head-body",auto_activate:true,...options.defaults};
+  if(!trainingFormReady) {
+    for(const [id,key] of [["trainEpochs","epochs"],["trainBatch","batch"],["trainImgsz","imgsz"],["trainWorkers","workers"],["trainThreads","threads"],["trainName","name"]]) $(id).value=defaults[key];
+    $("trainAutoActivate").checked=defaults.auto_activate!==false;
+  }
+  for(const [id,items,preferred] of [["trainDevice",options.devices||[{id:"cpu",label:"CPU"}],defaults.device],["trainCheckpoint",options.checkpoints||[],defaults.checkpoint_id]]) {
+    const control=$(id), previous=trainingFormReady?control.value:preferred;
+    const choices=items.map(item=>({id:String(item.id),label:String(item.label)}));
+    const existing=[...control.options].map(option=>({id:option.value,label:option.textContent}));
+    if(JSON.stringify(choices)!==JSON.stringify(existing)) {
+      control.replaceChildren();
+      for(const item of choices) { const option=document.createElement("option"); option.value=item.id; option.textContent=item.label; control.append(option); }
+    }
+    if(choices.some(item=>item.id===previous)) control.value=previous;
+    else if(choices.some(item=>item.id===preferred)) control.value=preferred;
+  }
+  trainingFormReady=true;
+}
+function renderWorkbench() {
+  const models=workbench.models||[];
+  if(!models.some(model=>model.id===selectedModelId)) {
+    selectedModelId=models.find(model=>model.id===workbench.active_model_id)?.id || models[0]?.id || "";
+    clearProposals(); draw();
+  }
+  $("modelSelect").replaceChildren();
+  if(!models.length) { const option=document.createElement("option"); option.textContent="No exported models yet"; option.value=""; $("modelSelect").append(option); }
+  for(const model of models) { const option=document.createElement("option"); option.value=model.id; option.textContent=`${model.label}${model.id===workbench.active_model_id?" · default":""}`; $("modelSelect").append(option); }
+  $("modelSelect").value=selectedModelId;
+  const model=models.find(item=>item.id===selectedModelId);
+  const viewLabel=model?.view?model.view[0].toUpperCase()+model.view.slice(1):"Full";
+  const shape=model?.input_shape, dimensions=Array.isArray(shape) && shape.length===4?` · ${shape[3]} × ${shape[2]}`:"";
+  $("workbenchStatus").textContent=model?`${viewLabel} view${dimensions}`:"Place a local best.onnx in the application folder, then refresh.";
+  $("workbenchStatus").title=model?.path || ""; $("modelSelect").title=model?.path || "";
+  const job=workbench.training; $("trainingStatus").hidden=!job;
+  if(job) {
+    $("trainingStatus").classList.toggle("failed",["failed","interrupted"].includes(job.state));
+    const epoch=Number.isFinite(job.epoch)&&Number.isFinite(job.epochs)?` · epoch ${job.epoch} / ${job.epochs}`:"";
+    $("jobTitle").textContent=`Training ${job.state}${epoch}`;
+    $("jobMessage").textContent=job.message || (job.state==="completed"?"Model export completed.":"Waiting for training progress…");
+    const progress=Math.min(100,Math.max(0,Number(job.progress)||0)); $("jobProgress").style.width=`${progress}%`;
+    $("jobPath").textContent=job.run_path || "";
+    $("jobLog").textContent=Array.isArray(job.log_tail)?job.log_tail.join("\n"):String(job.log_tail||"No log output yet.");
+  }
+  setupTrainingForm(workbench.options||{}); updateWorkbenchControls();
+}
+async function refreshWorkbench() {
+  if(workbenchLoading || workbenchAction) return;
+  workbenchLoading=true; const generation=workbenchGeneration;
+  try { const result=await api("/api/workbench"); if(generation===workbenchGeneration) { workbench=result; renderWorkbench(); } }
+  catch(error) {
+    if(!workbench) $("workbenchStatus").textContent=error.status===404?"Training tools unavailable on this server.":`Training tools unavailable: ${error.message}`;
+  } finally { workbenchLoading=false; updateWorkbenchControls(); }
+}
+async function workbenchCommand(path,payload) {
+  if(workbenchAction) return null;
+  workbenchAction=true; workbenchGeneration++; workbenchError(); updateWorkbenchControls();
+  try { return await api(path,payload); }
+  catch(error) { workbenchError(error.message); return null; }
+  finally { workbenchAction=false; updateWorkbenchControls(); }
+}
+function clearProposals() {
+  proposalSequence++; proposal=null; proposing=false; $("proposalPreview").hidden=true;
+  $("proposalEstimates").replaceChildren(); $("proposalWarnings").replaceChildren();
+}
+function proposalContextMatches(value) {
+  return value && value.frameId===currentId && value.modelId===selectedModelId && value.revision===frame?.revision && value.generation===recordingSequence;
+}
+function currentProposal() { return proposalContextMatches(proposal) && proposal.version===editVersion; }
+function annotationBox(box,includeScore=true) {
+  const result={class_id:box.class_id,x1:box.x1,y1:box.y1,x2:box.x2,y2:box.y2};
+  if(includeScore && Number.isFinite(box.score) && box.score>=0 && box.score<=1) result.score=box.score;
+  return result;
+}
+function renderProposalPreview() {
+  $("proposalPreview").hidden=!proposal; if(!proposal) return;
+  $("proposalSummary").textContent=`${proposal.boxes.length} model boxes · ${proposal.estimates.length} estimates${frame.status==="approved"?" · Approved frame: preview only":""}`;
+  $("proposalWarnings").replaceChildren();
+  for(const warning of proposal.warnings) { const item=document.createElement("li"); item.textContent=warning; $("proposalWarnings").append(item); }
+  $("proposalWarnings").hidden=!proposal.warnings.length;
+  $("estimateHelp").hidden=!proposal.estimates.length; $("proposalEstimates").hidden=!proposal.estimates.length; $("proposalEstimates").replaceChildren();
+  for(const estimate of proposal.estimates) {
+    const row=document.createElement("div"); row.className="estimate-row"; row.dataset.estimateId=estimate.estimate_id;
+    const copy=document.createElement("div"); copy.className="estimate-copy";
+    const title=document.createElement("strong"); title.textContent=`? ${estimate.class_id===0?"Head":"Body"} · estimated`;
+    const reason=document.createElement("p"); reason.textContent=estimate.reason;
+    const evidence=document.createElement("p"); evidence.textContent=`Evidence: ${estimate.evidence}`; copy.append(title,reason,evidence);
+    const actions=document.createElement("div"); actions.className="estimate-actions";
+    const use=document.createElement("button"); use.className="small estimate-use"; use.textContent="Use estimate"; use.onclick=()=>useEstimate(estimate.estimate_id);
+    const dismiss=document.createElement("button"); dismiss.className="small estimate-dismiss"; dismiss.textContent="Dismiss"; dismiss.setAttribute("aria-label",`Dismiss estimated ${estimate.class_id===0?"Head":"Body"}`); dismiss.onclick=()=>dismissEstimate(estimate.estimate_id);
+    actions.append(use,dismiss); row.append(copy,actions); $("proposalEstimates").append(row);
+  }
+  updateWorkbenchControls();
+}
+function validProposal(box) {
+  return box && [0,1].includes(box.class_id) && [box.x1,box.y1,box.x2,box.y2].every(value=>typeof value==="number" && Number.isFinite(value) && value>=0 && value<=1) && box.x2>box.x1 && box.y2>box.y1;
+}
+function sameBox(a,b) {
+  if(a.class_id!==b.class_id) return false;
+  const overlap=Math.max(0,Math.min(a.x2,b.x2)-Math.max(a.x1,b.x1))*Math.max(0,Math.min(a.y2,b.y2)-Math.max(a.y1,b.y1));
+  const areaA=(a.x2-a.x1)*(a.y2-a.y1), areaB=(b.x2-b.x1)*(b.y2-b.y1);
+  return overlap/(areaA+areaB-overlap)>=.7;
+}
+async function suggestBoxes() {
+  if($("suggestBoxes").disabled) return;
+  const confidence=Number($("proposalConfidence").value);
+  if(!Number.isFinite(confidence) || confidence<.05 || confidence>.95) { notice("Choose a confidence from 0.05 to 0.95.",true); return; }
+  clearProposals(); const sequence=proposalSequence, frameId=currentId, revision=frame.revision, modelId=selectedModelId, version=editVersion, generation=recordingSequence, recordingId=selectedRecordingId;
+  proposing=true; updateWorkbenchControls(); draw();
+  try {
+    const result=await api(`/api/frame/${encodeURIComponent(frameId)}/propose`,{model_id:modelId,revision,confidence,tiles:$("proposalTiles").checked,assist:$("proposalAssist").checked},recordingId);
+    if(generation!==recordingSequence || sequence!==proposalSequence || currentId!==frameId || selectedModelId!==modelId || frame?.revision!==revision || editVersion!==version) return;
+    if(result.frame_id!==frameId || result.model_id!==modelId || result.revision!==revision || !Array.isArray(result.boxes)) throw new Error("The proposal response no longer matches this frame and model. Try again.");
+    const ids=new Set(), estimates=[];
+    for(const estimate of Array.isArray(result.estimates)?result.estimates:[]) {
+      if(!validProposal(estimate) || typeof estimate.estimate_id!=="string" || !estimate.estimate_id || ids.has(estimate.estimate_id) || typeof estimate.reason!=="string" || typeof estimate.evidence!=="string") continue;
+      ids.add(estimate.estimate_id); estimates.push({...annotationBox(estimate,false),estimate_id:estimate.estimate_id,reason:estimate.reason,evidence:estimate.evidence});
+    }
+    proposal={frameId,modelId,revision,version,generation,recordingId,boxes:result.boxes.filter(validProposal).map(box=>annotationBox(box)),estimates,warnings:(Array.isArray(result.warnings)?result.warnings:[]).filter(value=>typeof value==="string")};
+    renderProposalPreview();
+    notice(""); draw();
+  } catch(error) { if(sequence===proposalSequence) notice(error.message,true); }
+  finally { if(sequence===proposalSequence) { proposing=false; updateWorkbenchControls(); } }
+}
+function applyProposals() {
+  if(!proposal || !canEdit() || drag || frame.status==="approved") return;
+  if(!currentProposal()) { clearProposals(); draw(); updateWorkbenchControls(); return; }
+  const additions=[];
+  for(const box of proposal.boxes) if(!boxes.some(existing=>sameBox(existing,box)) && !additions.some(existing=>sameBox(existing,box))) additions.push(clone(box));
+  if(additions.length) { pushHistory(true); boxes.push(...additions); selected=boxes.length-additions.length; }
+  proposal.boxes=[];
+  if(additions.length) { setDirty(true); renderBoxes(); }
+  renderProposalPreview(); draw(); notice(additions.length?`Added ${additions.length} model boxes.`:"No new model boxes.");
+}
+function useEstimate(id) {
+  if(!currentProposal() || !canEdit() || drag || frame.status==="approved") return;
+  const estimate=proposal.estimates.find(item=>item.estimate_id===id); if(!estimate) return;
+  const duplicate=boxes.some(box=>sameBox(box,estimate));
+  if(!duplicate) { pushHistory(true); boxes.push(annotationBox(estimate,false)); selected=boxes.length-1; }
+  proposal.estimates=proposal.estimates.filter(item=>!sameBox(item,estimate));
+  if(!duplicate) { setDirty(true); renderBoxes(); }
+  renderProposalPreview(); draw(); notice(duplicate?"A matching box already exists.":"Estimate added as an editable box.");
+}
+function dismissEstimate(id) {
+  if(!currentProposal()) return;
+  proposal.estimates=proposal.estimates.filter(item=>item.estimate_id!==id); renderProposalPreview(); draw();
+}
+function point(event) { const p=canvasPoint(event); return {x:Math.max(0,Math.min(1,(p.x-view.x)/view.scale/640)),y:Math.max(0,Math.min(1,(p.y-view.y)/view.scale/448))}; }
+canvas.addEventListener('wheel',event=>{
+  if(!image) return;
+  event.preventDefault();
+  const delta=event.deltaY*(event.deltaMode===1?16:event.deltaMode===2?448:1);
+  zoomTo(view.scale*Math.exp(-delta*.002),canvasPoint(event));
+},{passive:false});
+function hitCandidates(p) {
+  return boxes.map((box,index)=>({box,index})).filter(({box})=>p.x>=box.x1 && p.x<=box.x2 && p.y>=box.y1 && p.y<=box.y2)
+    .sort((a,b)=>{
+      const area=(a.box.x2-a.box.x1)*(a.box.y2-a.box.y1)-(b.box.x2-b.box.x1)*(b.box.y2-b.box.y1);
+      
+      
+      return a.box.class_id-b.box.class_id || (Math.abs(area)>1/(640*448)?area:0) || a.index-b.index;
+    }).map(item=>item.index);
+}
+function startPan(event,deselect=false) {
+  drag={kind:"pan",pointerId:event.pointerId,start:canvasPoint(event),original:{x:view.x,y:view.y},originalSelected:selected};
+  if(deselect) selectBox(-1);
+  updateCursor(); updateButtons();
+}
+canvas.addEventListener("pointerdown", event => {
+  if(drag) return;
+  if(image && !busy && (event.button===1 || (event.button===0 && (tool==='pan'||spacePan)))) {
+    event.preventDefault(); canvas.focus({preventScroll:true}); canvas.setPointerCapture(event.pointerId);
+    startPan(event); return;
+  }
+  if(!canEdit() || event.button!==0) return; event.preventDefault(); canvas.focus({preventScroll:true}); const p=point(event);
+  canvas.setPointerCapture(event.pointerId);
+  if(tool === "draw") { drag={kind:"draw",pointerId:event.pointerId,start:p,latest:p}; draw(); updateWorkbenchControls(); return; }
+  const candidates=hitCandidates(p);
+  if(!event.altKey && selected>=0 && boxes[selected] && (!candidates.length || candidates[0]===selected)) {
+    const rect=canvas.getBoundingClientRect(); const handle=handles(boxes[selected]).find(([x,y])=>Math.abs(x-p.x)*rect.width*view.scale<=8 && Math.abs(y-p.y)*rect.height*view.scale<=8);
+    if(handle) { drag={kind:"resize",pointerId:event.pointerId,index:selected,handle:handle[2],start:p,screenStart:{x:event.clientX,y:event.clientY},original:clone(boxes[selected]),committed:false}; updateWorkbenchControls(); return; }
+  }
+  const found=candidates.length?(event.altKey?candidates[(candidates.indexOf(selected)+1)%candidates.length]:candidates[0]):-1;
+  if(found<0 && view.scale>1) { startPan(event,true); return; }
+  selectBox(found);
+  if(found>=0) { drag={kind:"move",pointerId:event.pointerId,index:found,start:p,screenStart:{x:event.clientX,y:event.clientY},original:clone(boxes[found]),committed:false}; updateWorkbenchControls(); }
+});
+canvas.addEventListener("pointermove", event => {
+  if(drag && drag.pointerId!==event.pointerId) return;
+  if(drag?.kind==='pan') {
+    const p=canvasPoint(event); view.x=drag.original.x+p.x-drag.start.x; view.y=drag.original.y+p.y-drag.start.y;
+    clampView(); draw(); return;
+  }
+  if(!drag) return; const p=point(event); drag.latest=p;
+  if(drag.kind!=="draw") {
+    if(!drag.committed && Math.hypot(event.clientX-drag.screenStart.x,event.clientY-drag.screenStart.y)<3) return;
+    const box=clone(drag.original), dx=p.x-drag.start.x, dy=p.y-drag.start.y;
+    if(drag.kind==="move") { const ax=Math.max(-box.x1,Math.min(1-box.x2,dx)), ay=Math.max(-box.y1,Math.min(1-box.y2,dy)); box.x1+=ax; box.x2+=ax; box.y1+=ay; box.y2+=ay; }
+    else { const h=drag.handle; if(h.includes("w")) box.x1=Math.min(p.x,box.x2-1/640); if(h.includes("e")) box.x2=Math.max(p.x,box.x1+1/640); if(h.includes("n")) box.y1=Math.min(p.y,box.y2-1/448); if(h.includes("s")) box.y2=Math.max(p.y,box.y1+1/448); }
+    if(JSON.stringify(box)!==JSON.stringify(drag.original)) {
+      if(!drag.committed) { pushHistory(); drag.committed=true; }
+      delete box.score;
+    }
+    boxes[drag.index]=box; setDirty(); renderBoxes();
+  }
+  draw();
+});
+function finishDrag(event,cancel=false) {
+  if(!drag) return;
+  if(event?.pointerId!==undefined && event.pointerId!==drag.pointerId) return;
+  const pointerId=drag.pointerId;
+  if(drag.kind==='pan') {
+    if(cancel) { view.x=drag.original.x; view.y=drag.original.y; selected=drag.originalSelected; }
+    drag=null; if(canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId); updateCursor(); renderBoxes(); draw(); return;
+  }
+  const changed=drag.committed || drag.kind==="draw";
+  if(cancel && drag.kind!=="draw" && drag.committed) { boxes[drag.index]=drag.original; history.pop(); }
+  if(!cancel && drag.kind==="draw") { const end=point(event), start=drag.start; if(Math.abs(end.x-start.x)*640>=1 && Math.abs(end.y-start.y)*448>=1) { pushHistory(); boxes.push({class_id:drawClass,x1:Math.min(start.x,end.x),y1:Math.min(start.y,end.y),x2:Math.max(start.x,end.x),y2:Math.max(start.y,end.y)}); selected=boxes.length-1; } }
+  drag=null; if(canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId); if(changed) setDirty(); renderBoxes(); draw(); updateCursor();
+}
+canvas.addEventListener("pointerup",event=>finishDrag(event)); canvas.addEventListener("pointercancel",event=>finishDrag(event,true));
+canvas.addEventListener("lostpointercapture",event=>finishDrag(event,true));
+canvas.addEventListener('auxclick',event=>{if(event.button===1) event.preventDefault();});
+function removeSelected() { if(!canEdit()||drag||selected<0) return; pushHistory(); boxes.splice(selected,1); selected=-1; setDirty(); renderBoxes(); draw(); }
+function undo() {
+  if(!canEdit()||drag||!history.length) return;
+  const state=history.pop(); boxes=state.boxes; selected=state.selected;
+  const restorePreview=proposalContextMatches(state.proposal);
+  if(restorePreview) proposal=state.proposal;
+  setDirty(restorePreview); renderBoxes(); if(restorePreview) renderProposalPreview(); draw();
+}
+$("selectTool").onclick=()=>setTool("select"); $("drawTool").onclick=()=>setTool("draw"); $("headClass").onclick=()=>setClass(0); $("bodyClass").onclick=()=>setClass(1);
+$("panTool").onclick=()=>setTool('pan');
+$("zoomIn").onclick=()=>zoomTo(view.scale*1.25); $("zoomOut").onclick=()=>zoomTo(view.scale/1.25); $("zoomReset").onclick=fitImage;
+$("labelsToggle").onclick=()=>{ showLabels=!showLabels; $("labelsToggle").setAttribute("aria-pressed",String(showLabels)); $("labelsToggle").textContent=showLabels?"Labels on":"Labels off"; $("labelsToggle").classList.toggle("active",showLabels); draw(); };
+$("delete").onclick=removeSelected; $("undo").onclick=undo;
+$("selectedClass").onchange=()=>{ if(!canEdit()||selected<0) return; pushHistory(); boxes[selected].class_id=Number($("selectedClass").value); delete boxes[selected].score; setDirty(); renderBoxes(); draw(); };
+$("previous").onclick=()=>{ const list=visibleFrames(), index=list.findIndex(item=>item.id===currentId); if(index>0) navigate(list[index-1].id); };
+$("next").onclick=()=>{ const list=visibleFrames(), index=list.findIndex(item=>item.id===currentId); if(index<list.length-1) navigate(list[index+1].id); };
+$("filter").onchange=async()=>{ if(!discardOkay()) { $("filter").value=currentFilter; return; } currentFilter=$("filter").value; gridPage=0; await showFrame(visibleFrames()[0]?.id); };
+$("gridSize").onchange=()=>changeGridSize(Number($("gridSize").value));
+$("gridPrevious").onclick=()=>{ if(!busy && gridPage>0) { gridPage--; renderGrid(); } };
+$("gridNext").onclick=()=>{ if(!busy && (gridPage+1)*gridSize<visibleFrames().length) { gridPage++; renderGrid(); } };
+$("startEmptyScan").onclick=()=>emptyScanCommand("/api/empty-scan/start");
+$("cancelEmptyScan").onclick=()=>emptyScanCommand("/api/empty-scan/cancel");
+$("reload").onclick=loadManifest; $("save").onclick=()=>saveFrame("pending"); $("reject").onclick=()=>saveFrame("rejected",false,true);
+$("approve").onclick=()=>{ if(!canEdit()) return; if(!boxes.length) $("emptyDialog").showModal(); else saveFrame("approved",false,true); };
+$("cancelEmpty").onclick=()=>$("emptyDialog").close(); $("confirmEmpty").onclick=()=>{ $("emptyDialog").close(); saveFrame("approved",true,true); };
+$("export").onclick=async()=>{
+  if(dirty) { notice("Save changes before exporting. Only saved, approved frames are included.",true); return; }
+  if(busy) return; const generation=recordingSequence, recordingId=selectedRecordingId;
+  busy=true; updateButtons(); $("exportResult").textContent="";
+  try { const result=await api("/api/export",{},recordingId); if(generation!==recordingSequence) return; $("exportResult").textContent=`${result.train} train · ${result.val} validation frames\n${result.path}`; notice("Export complete."); }
+  catch(error) { if(generation===recordingSequence) notice(error.message,true); } finally { if(generation===recordingSequence) { busy=false; updateButtons(); } }
+};
+$("recordingSelect").onchange=()=>openRecording($("recordingSelect").value);
+$("framesTab").onclick=()=>selectSidebarPanel("frames"); $("recordingsTab").onclick=()=>selectSidebarPanel("recordings");
+for(const name of ["frames","recordings"]) $(`${name}Tab`).addEventListener("keydown",event=>{
+  if(!["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Home","End"].includes(event.key)) return;
+  event.preventDefault(); event.stopPropagation();
+  const target=event.key==="Home"?"frames":event.key==="End"?"recordings":name==="frames"?"recordings":"frames";
+  selectSidebarPanel(target); $(`${target}Tab`).focus({preventScroll:true});
+});
+$("closeEditingToast").onclick=dismissEditingTips;
+$("browseVideo").onclick=browseVideo; $("browseAnotherVideo").onclick=browseVideo;
+$("openPreparation").onclick=openPreparation; $("closePreparation").onclick=()=>$("preparationDialog").close();
+$("openPreparedRecording").onclick=()=>openRecording(recordingLibrary?.preparation?.recording_id);
+$("preparationForm").onsubmit=async event=>{
+  event.preventDefault(); if(!recordingLibrary || recordingAction || !pickedVideo || !selectedModelId || preparationActive() || !$("preparationForm").reportValidity()) return;
+  const payload={selection_id:pickedVideo.selection_id,model_id:selectedModelId,sample_fps:Number($("prepareSampleFps").value),max_images:Number($("prepareMaxImages").value),confidence:Number($("prepareConfidence").value),tiles:$("prepareTiles").checked};
+  recordingAction=true; recordingLibraryGeneration++; recordingError(); $("preparationError").textContent=""; updateRecordingControls();
+  try { const job=await api("/api/recordings/prepare",payload); recordingLibrary.preparation=job; renderRecordings(); $("preparationDialog").close(); notice("Frame preparation started."); }
+  catch(error) { $("preparationError").textContent=error.message; }
+  finally { recordingAction=false; updateRecordingControls(); }
+};
+$("modelSelect").onchange=()=>{ selectedModelId=$("modelSelect").value; clearProposals(); draw(); renderWorkbench(); };
+$("useModel").onclick=async()=>{ const result=await workbenchCommand("/api/models/select",{model_id:selectedModelId}); if(result) { await refreshWorkbench(); notice("Default model updated."); } };
+function openTraining() { if(workbench) { $("trainingError").textContent=""; $("trainingDialog").showModal(); } }
+$("openTraining").onclick=openTraining; $("viewTraining").onclick=openTraining;
+$("closeTraining").onclick=()=>$("trainingDialog").close();
+$("trainingForm").onsubmit=async event=>{
+  event.preventDefault(); if(!workbench || workbenchAction || trainingActive() || !$("trainingForm").reportValidity()) return;
+  const payload={}; for(const [key,value] of new FormData($("trainingForm"))) payload[key]=value;
+  for(const key of ["epochs","batch","imgsz","workers","threads"]) payload[key]=Number(payload[key]);
+  payload.auto_activate=$("trainAutoActivate").checked;
+  $("trainingError").textContent=""; workbenchAction=true; workbenchGeneration++; workbenchError(); updateWorkbenchControls();
+  try { const job=await api("/api/training/start",payload); workbench.training=job; renderWorkbench(); $("trainingDialog").close(); notice("Training started in PowerShell."); }
+  catch(error) { $("trainingError").textContent=error.message; }
+  finally { workbenchAction=false; updateWorkbenchControls(); }
+};
+$("suggestBoxes").onclick=suggestBoxes; $("applyProposals").onclick=applyProposals;
+$("proposalAssist").onchange=()=>{ clearProposals(); updateWorkbenchControls(); draw(); };
+$("discardProposals").onclick=()=>{ clearProposals(); updateWorkbenchControls(); draw(); notice(""); };
+document.addEventListener("keydown",event=>{
+  if(event.key==="Escape" && drag) { event.preventDefault(); finishDrag(null,true); return; }
+  if($("emptyDialog").open || $("trainingDialog").open || $("preparationDialog").open || /INPUT|SELECT|TEXTAREA/.test(event.target.tagName)) return;
+  if(event.code==='Space' && document.activeElement===canvas && image) { event.preventDefault(); spacePan=true; updateCursor(); return; }
+  if(drag) return;
+  if(gridSize!==1) { if(event.key==="ArrowLeft" || event.key==="ArrowRight") { event.preventDefault(); $(event.key==="ArrowLeft"?"gridPrevious":"gridNext").click(); } return; }
+  if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="z") { event.preventDefault(); undo(); return; }
+  if(event.key==="ArrowLeft" || event.key==="ArrowRight") { event.preventDefault(); $(event.key==="ArrowLeft"?"previous":"next").click(); return; }
+  if(!canEdit()) return;
+  if(event.key==="Delete"||event.key==="Backspace") { event.preventDefault(); removeSelected(); }
+  else if(event.key.toLowerCase()==="v") setTool("select"); else if(event.key.toLowerCase()==="d") setTool("draw");
+  else if(event.key==="1") setClass(0); else if(event.key==="2") setClass(1);
+});
+document.addEventListener('keyup',event=>{if(event.code==='Space'){spacePan=false;updateCursor();}});
+window.addEventListener('blur',()=>{spacePan=false;if(drag) finishDrag(null,true);updateCursor();});
+window.addEventListener("resize",fitGridToViewport);
+window.addEventListener("beforeunload",event=>{ if(dirty) { event.preventDefault(); event.returnValue=""; } });
+setTool("select"); showEditingTips(); refreshWorkbench();
+refreshRecordings().finally(async()=>{ await loadManifest(); refreshEmptyScan(); });
+setInterval(refreshWorkbench,3000);
+setInterval(refreshRecordings,3000);
+setInterval(refreshEmptyScan,3000);
+</script>
+</body>
+</html>
