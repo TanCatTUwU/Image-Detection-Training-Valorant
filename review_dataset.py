@@ -428,6 +428,21 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
             self.close_connection = True
             self._send(status, {'error': message})
 
+        def _download(self, path, filename):
+            with path.open('rb') as stream:
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/octet-stream')
+                self.send_header('Content-Length', str(os.fstat(stream.fileno()).st_size))
+                self.send_header('Content-Disposition', f'attachment; filename="{filename}"')
+                self.send_header('Cache-Control', 'no-store')
+                self.send_header('X-Content-Type-Options', 'nosniff')
+                self.send_header('Referrer-Policy', 'no-referrer')
+                try:
+                    self.end_headers()
+                    shutil.copyfileobj(stream, self.wfile, length=1024 * 1024)
+                except ConnectionError:
+                    self.close_connection = True
+
         def _route(self):
             parsed = urlsplit(self.path)
             if parsed.scheme or parsed.netloc or '%' in parsed.path or ('\\' in parsed.path):
@@ -474,6 +489,11 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                     return self._send(200, get_recordings().snapshot())
                 if route == '/api/workbench':
                     return self._send(200, get_workbench().snapshot())
+                download = re.fullmatch(r'/api/models/([a-z0-9-]+)/download/(onnx|pt)', route)
+                if download:
+                    model_id, format = download.groups()
+                    path = get_workbench().registry.artifact_path(model_id, format)
+                    return self._download(path, f'{model_id}.{format}')
                 if route == '/api/empty-scan':
                     return self._send(200, get_empty_scans().snapshot(self._store()))
                 if route.startswith('/image/') and FRAME_ID.fullmatch(route[7:]):

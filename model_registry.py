@@ -179,7 +179,41 @@ class ModelRegistry:
         entries = self._entries()
         active_id = self._active_id(entries)
         keys = ('id', 'label', 'path', 'view', 'input_shape', 'created_at')
-        return [{**{key: entry[key] for key in keys}, 'is_active': entry['id'] == active_id} for entry in entries]
+        return [{**{key: entry[key] for key in keys}, 'is_active': entry['id'] == active_id,
+                 'formats': self._formats(entry)} for entry in entries]
+
+    def _artifact_path(self, entry, format):
+        if format not in ('onnx', 'pt'):
+            raise ValueError('Choose onnx or pt format')
+        builtin = entry['id'].startswith('builtin-')
+        parent = self.project if builtin else self.root / entry['id']
+        if format == 'onnx':
+            path = Path(entry['path'])
+        else:
+            if not builtin and not entry.get('checkpoint'):
+                raise FileNotFoundError('This model has no matching PT checkpoint')
+            path = parent / ('best.pt' if builtin else 'checkpoint.pt')
+        if path.is_symlink() or path.resolve().parent != parent.absolute() or not path.is_file():
+            raise FileNotFoundError('The requested model file is unavailable')
+        return path
+
+    def _formats(self, entry):
+        formats = []
+        for format in ('onnx', 'pt'):
+            try:
+                self._artifact_path(entry, format)
+                formats.append(format)
+            except OSError:
+                pass
+        return formats
+
+    def artifact_path(self, model_id, format):
+        if not isinstance(model_id, str):
+            raise ValueError('Choose a known model ID')
+        entry = next((entry for entry in self._entries() if entry['id'] == model_id), None)
+        if entry is None:
+            raise ValueError('Unknown model ID; refresh the model library')
+        return self._artifact_path(entry, format)
 
     def active(self):
         return next((entry for entry in self.list_models() if entry['is_active']), None)

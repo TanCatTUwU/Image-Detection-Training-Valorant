@@ -14,7 +14,8 @@ from pathlib import Path
 from model_registry import ModelRegistry, atomic_json, file_lock, process_alive, read_json, utc_now
 PROJECT = Path(__file__).resolve().parent
 ACTIVE_STATES = {'queued', 'running', 'exporting'}
-DEFAULTS = dict(epochs=30, batch=4, imgsz=320, workers=0, threads=2, device='cpu', name='train-head-body', auto_activate=True)
+DEFAULTS = dict(epochs=30, batch=4, imgsz=320, model_width=320, model_height=320,
+                workers=0, threads=2, device='cpu', name='train-head-body', auto_activate=True)
 RESERVED = {'con', 'prn', 'aux', 'nul', 'clock$', 'conin$', 'conout$'}
 RESERVED.update((f'{prefix}{number}' for prefix in ('com', 'lpt') for number in '123456789¹²³'))
 
@@ -28,12 +29,13 @@ def validate_options(payload, registry):
     if set(payload) - (set(DEFAULTS) | {'checkpoint_id'}):
         raise ValueError('Unknown training option')
     options = {**DEFAULTS, **payload}
-    for key, lower, upper in (('epochs', 1, 1000), ('batch', 1, 128), ('imgsz', 64, 1280), ('workers', 0, 8), ('threads', 1, 32)):
+    for key, lower, upper in (('epochs', 1, 1000), ('batch', 1, 128), ('imgsz', 64, 1280),
+                              ('model_width', 64, 1280), ('model_height', 64, 1280), ('workers', 0, 8), ('threads', 1, 32)):
         value = options[key]
         if isinstance(value, bool) or not isinstance(value, int) or (not lower <= value <= upper):
             raise ValueError(f'{key} must be an integer from {lower} to {upper}')
-    if options['imgsz'] % 32:
-        raise ValueError('imgsz must be a multiple of 32')
+    if any(options[key] % 32 for key in ('imgsz', 'model_width', 'model_height')):
+        raise ValueError('Image size, model width and model height must be multiples of 32')
     if options['device'] != 'cpu':
         raise ValueError('This prepared runtime supports CPU training; DirectML is used for inference')
     if not isinstance(options['auto_activate'], bool):
@@ -200,7 +202,8 @@ def _train(job, update):
     options = job['options']
     arguments = ['--data', job['data'], '--weights', job['checkpoint'], '--device', options['device'], '--name', job['id']]
     for key in ('epochs', 'batch', 'imgsz', 'workers', 'threads'):
-        arguments += ['--' + key, str(options[key])]
+        value = max(options[key], options.get('model_width', 320), options.get('model_height', 320)) if key == 'imgsz' else options[key]
+        arguments += ['--' + key, str(value)]
     result = {}
 
     def progress(event):
@@ -216,9 +219,9 @@ def _train(job, update):
         raise ValueError('Trainer failed; see the training log')
     return Path(result['checkpoint'])
 
-def _export(checkpoint, destination):
+def _export(checkpoint, destination, *, width=320, height=320):
     from ultralytics import YOLO
-    exported = Path(YOLO(str(checkpoint), task='detect').export(format='onnx', imgsz=320, batch=1, device='cpu', dynamic=False, simplify=True, opset=17, quantize=None, nms=False)).resolve()
+    exported = Path(YOLO(str(checkpoint), task='detect').export(format='onnx', imgsz=[height, width], batch=1, device='cpu', dynamic=False, simplify=True, opset=17, quantize=None, nms=False)).resolve()
     if exported != destination.resolve():
         import shutil
         shutil.copyfile(exported, destination)
@@ -260,7 +263,8 @@ def run_training_job(manifest, *, registry=None, trainer=None, exporter=None, va
                 with contextlib.redirect_stdout(_Tee(sys.stdout, log)), contextlib.redirect_stderr(_Tee(sys.stderr, log)):
                     stage = 'training'
                     try:
-                        validate_options(job['options'], registry)
+                        options = validate_options(job['options'], registry)
+                        update(options=options)
                         os.environ.update({key: value for key, value in prepared_environment(project, job['options']['threads']).items() if key != 'PATH'})
                         update(state='running', worker_pid=os.getpid(), message='Fine-tuning the reviewed dataset')
                         print(f"Job {job['id']}: CPU training, {job['epochs']} epochs; log: {log_path}", flush=True)
@@ -268,24 +272,31 @@ def run_training_job(manifest, *, registry=None, trainer=None, exporter=None, va
                         if not checkpoint.is_file() or checkpoint.suffix != '.pt':
                             raise ValueError('Training did not produce a best checkpoint')
                         stage = 'export'
-                        update(state='exporting', epoch=job['epochs'], progress=92, run_path=str(checkpoint.parent.parent), message='Exporting a static ONNX model')
-                        exported = Path((exporter or _export)(checkpoint, checkpoint.with_suffix('.onnx'))).resolve()
-                        registry.validator(exported)
+                        width, height = options['model_width'], options['model_height']
+                        update(state='exporting', epoch=job['epochs'], progress=92, run_path=str(checkpoint.parent.parent), message=f'PT checkpoint saved; exporting {width} × {height} ONNX')
+                        if exporter is None:
+                            exported = Path(_export(checkpoint, checkpoint.with_suffix('.onnx'), width=width, height=height)).resolve()
+                        else:
+                            exported = Path(exporter(checkpoint, checkpoint.with_suffix('.onnx'))).resolve()
+                        if list(registry.validator(exported)['input_shape']) != [1, 3, height, width]:
+                            raise ValueError('Exported model input size does not match the requested resolution')
                         candidates = [('focus', exported)]
-                        try:
-                            candidates += list((variant_builder or _variants)(exported))
-                        except Exception as exc:
-                            print(f'Smaller view variants unavailable; retaining the validated focus model: {exc}', flush=True)
+                        if (width, height) == (320, 320):
+                            try:
+                                candidates += list((variant_builder or _variants)(exported))
+                            except Exception as exc:
+                                print(f'Smaller view variants unavailable; retaining the validated focus model: {exc}', flush=True)
                         stage = 'registration'
                         update(progress=96, message='Validating and storing trained models')
                         entries = []
                         for view, path in candidates:
                             entry = registry.register(path, label=f"{job['options']['name']} · {view}", view=view, checkpoint=checkpoint)
                             entries.append(entry)
-                        selected = next((entry for entry in entries if entry['view'] == 'fast'), entries[0])
+                        selected = entries[0]
                         if job['options']['auto_activate']:
                             registry.select(selected['id'])
-                        update(state='completed', progress=100, model_id=selected['id'], message=('Trained models saved; the fast model is now the default' if selected['view'] == 'fast' else 'Trained model saved') if job['options']['auto_activate'] else 'Trained models saved; automatic activation was disabled')
+                        update(state='completed', progress=100, model_id=selected['id'],
+                               message=f'PT and ONNX saved · {width} × {height}' + (' · this model is now the default' if options['auto_activate'] else ''))
                         print(job['message'], flush=True)
                         return 0
                     except KeyboardInterrupt:
