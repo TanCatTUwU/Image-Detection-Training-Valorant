@@ -234,7 +234,7 @@ class ReviewStore:
             old_label = label.read_bytes() if label.exists() else None
             atomic_write(label, yolo_text(boxes).encode('utf-8'))
             try:
-                signature = atomic_write(self._path('manifest.json'), (json.dumps(data, indent=2, ensure_ascii=False, allow_nan=False) + '\n').encode('utf-8'))
+                signature = atomic_write(self._path('manifest.json'), (json.dumps(data, separators=(',', ':'), ensure_ascii=False, allow_nan=False) + '\n').encode('utf-8'))
                 self._cache_committed_manifest(data, signature)
             except Exception:
                 if old_label is None:
@@ -291,7 +291,7 @@ class ReviewStore:
             if added:
                 atomic_write(label, yolo_text(merged).encode('utf-8'))
             try:
-                signature = atomic_write(self._path('manifest.json'), (json.dumps(data, indent=2, ensure_ascii=False, allow_nan=False) + '\n').encode('utf-8'))
+                signature = atomic_write(self._path('manifest.json'), (json.dumps(data, separators=(',', ':'), ensure_ascii=False, allow_nan=False) + '\n').encode('utf-8'))
                 self._cache_committed_manifest(data, signature)
             except Exception:
                 if added:
@@ -338,7 +338,7 @@ class ReviewStore:
                     empty = True
                 updated[frame_id] = {**frame, 'status': status, 'empty_confirmed': empty, 'revision': revision + 1}
             data = {**snapshot, 'frames': [updated.get(frame['id'], frame) for frame in snapshot['frames']]}
-            signature = atomic_write(self._path('manifest.json'), (json.dumps(data, indent=2, ensure_ascii=False, allow_nan=False) + '\n').encode('utf-8'))
+            signature = atomic_write(self._path('manifest.json'), (json.dumps(data, separators=(',', ':'), ensure_ascii=False, allow_nan=False) + '\n').encode('utf-8'))
             self._cache_committed_manifest(data, signature)
             return {'frames': copy.deepcopy(list(updated.values()))}
 
@@ -356,7 +356,7 @@ class ReviewStore:
                     frames.append(frame)
             if count:
                 data = {**snapshot, 'frames': frames}
-                signature = atomic_write(self._path('manifest.json'), (json.dumps(data, indent=2, ensure_ascii=False, allow_nan=False) + '\n').encode('utf-8'))
+                signature = atomic_write(self._path('manifest.json'), (json.dumps(data, separators=(',', ':'), ensure_ascii=False, allow_nan=False) + '\n').encode('utf-8'))
                 self._cache_committed_manifest(data, signature)
             return {'rejected': count}
 
@@ -372,7 +372,7 @@ class ReviewStore:
             if frame['status'] != 'pending' or frame['boxes'] or frame['revision'] != revision or (revision != 0) or frame['empty_confirmed']:
                 return False
             frame.update(status='auto_removed', revision=revision + 1, empty_confirmed=False, empty_scan=clean)
-            signature = atomic_write(self._path('manifest.json'), (json.dumps(data, indent=2, ensure_ascii=False, allow_nan=False) + '\n').encode('utf-8'))
+            signature = atomic_write(self._path('manifest.json'), (json.dumps(data, separators=(',', ':'), ensure_ascii=False, allow_nan=False) + '\n').encode('utf-8'))
             self._cache_committed_manifest(data, signature)
             return True
 

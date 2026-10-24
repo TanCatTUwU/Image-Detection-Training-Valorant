@@ -179,6 +179,13 @@ class RecordingLibrary:
     def resolve(self, run_id):
         if not isinstance(run_id, str) or not RUN_ID.fullmatch(run_id):
             raise ValueError('Choose a known recording ID')
+        with self._catalog_lock:
+            known = next((run for run, cached in self._catalog_cache.items() if cached[1]['id'] == run_id), None)
+        if known is not None:
+            _ordinary(known)
+            manifest = _ordinary(known / 'manifest.json')
+            if known.is_dir() and manifest.is_file():
+                return known
         for path, entry in self._runs():
             if entry['id'] == run_id:
                 return path
@@ -489,7 +496,7 @@ class RecordingLibrary:
         try:
             env = dict(os.environ, PYTHONUNBUFFERED='1', PYTHONUTF8='1', YOLO_OFFLINE='true', YOLO_AUTOINSTALL='false', OMP_NUM_THREADS='1', MKL_NUM_THREADS='1')
             command = [str(self.python), '-u', str(PROJECT / 'recording_library.py'), '--worker', str(manifest)]
-            flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0) | getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0)
+            flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0) | getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0) | getattr(subprocess, 'BELOW_NORMAL_PRIORITY_CLASS', 0)
             with (folder / 'bootstrap.log').open('ab') as bootstrap:
                 process = self.launcher(command, cwd=str(self.project), env=env, stdin=subprocess.DEVNULL, stdout=bootstrap, stderr=subprocess.STDOUT, close_fds=True, creationflags=flags)
             with file_lock(folder / 'status.lock'):

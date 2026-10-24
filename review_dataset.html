@@ -46,6 +46,7 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid #4b5564;border-
 .training-recordings{padding:12px;margin:16px 0;border:1px solid var(--line);border-radius:5px;min-width:0}.training-recordings legend{font-size:12px;font-weight:600;padding:0 5px}.training-recordings-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}.training-recordings-head p{margin:0;font-size:11px}.training-recording-list{max-height:190px;overflow:auto;overscroll-behavior:contain}.training-recording-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}.training-recording-row label{display:flex;gap:8px;align-items:flex-start;font-size:12px;min-width:0}.training-recording-row input{margin-top:3px;flex-shrink:0}.training-recording-row strong{display:block;font-size:12px;font-weight:500;overflow-wrap:anywhere}.training-recording-row small{display:block;font-size:10px;color:var(--muted);margin-top:2px}.training-recording-row .validation-choice{font-size:11px;white-space:nowrap;color:var(--muted)}.training-recording-row.unavailable strong{color:var(--muted)}.training-recordings .training-options-note{margin:8px 0 0}.training-selection-status{margin:8px 0 0!important;font-size:11px!important}.training-selection-status.error{color:#f0aaa2}.training-grid label small{font-size:10px;font-weight:400;line-height:1.4}.training-augmentation{border:0;border-top:1px solid var(--line);padding:12px 0 0;margin:0;min-width:0}.training-augmentation legend{font-size:12px;font-weight:600;padding:0 8px 0 0}.training-augmentation .training-grid{margin:0 0 10px}.training-guidance{padding:10px 12px;border-left:2px solid #74849a;background:#20252d;font-size:11px!important}.training-metrics{margin:12px 0}.metric-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.metric-value{padding:8px 10px;background:#14181e;border:1px solid var(--line);border-radius:4px;min-width:0}.metric-value span{display:block;font-size:10px;color:var(--muted)}.metric-value strong{display:block;font-size:17px;font-weight:500;font-variant-numeric:tabular-nums;margin-top:2px}.training-plots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:10px}.training-plot{background:#14181e;border:1px solid var(--line);border-radius:4px;padding:9px;min-width:0}.training-plot h3{font-size:12px;font-weight:500;margin:0 0 5px}.training-plot svg{display:block;width:100%;height:auto}.plot-legend{display:flex;flex-wrap:wrap;gap:5px 12px;font-size:10px;color:var(--muted);margin-top:4px}.plot-legend span{display:flex;align-items:center;gap:5px}.plot-legend i{width:12px;height:2px;display:inline-block;background:var(--series-color)}.plot-empty{min-height:110px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;text-align:center}.training-metrics .metric-epoch{font-size:11px;margin:0 0 8px}.training-log-details{margin:10px 0}.training-log-details>summary{font-size:11px;color:var(--muted)}
 @media(max-width:760px){.sidebar-group .frame-list{display:flex;max-height:180px}.sidebar-group .counts{grid-template-columns:repeat(4,1fr)}.sidebar-group .assistant-connections{display:block;max-height:180px}.training-recordings{padding:10px}.training-recording-row{gap:8px}.training-recording-row .validation-choice{font-size:10px}.training-recording-list{max-height:180px}.metric-summary{grid-template-columns:repeat(3,minmax(0,1fr))}.metric-value{padding:7px}.metric-value strong{font-size:15px}.training-plots{grid-template-columns:1fr}.training-guidance{padding:8px 10px}.training-recordings-head{align-items:flex-start}.training-plot{padding:7px}}
 .lifecycle-buttons{display:flex;flex-wrap:wrap;gap:6px}.delete-reason{font-size:11px;color:var(--muted);margin:0;overflow-wrap:anywhere}.deleted-items-dialog{width:580px}.deleted-list{display:grid;gap:9px;margin-top:14px}.deleted-item{border:1px solid var(--line);border-radius:5px;padding:11px;display:flex;align-items:flex-start;gap:12px}.deleted-item-copy{flex:1;min-width:0;overflow-wrap:anywhere}.deleted-item strong{display:block;font-size:12px}.deleted-item p{margin:3px 0 0;font-size:11px}.deleted-item button{flex-shrink:0}.delete-guard{color:var(--amber)}#deleteTarget{overflow-wrap:anywhere}#deletedItemsMessage{margin-bottom:0}@media(max-width:760px){.recording-footer{flex-wrap:wrap}.recording-footer button{flex:1 1 calc(50% - 7px);width:auto}.recording-footer .delete-reason{flex-basis:100%}.deleted-item{flex-wrap:wrap}.model-bar .delete-reason{width:100%}}
+.frame-list{gap:0}.frame-list .frame-item{height:52px;min-height:52px;flex:none;margin:0 0 4px}.frame-list-spacer{flex:none;pointer-events:none}
 </style>
 </head>
 <body>
@@ -101,6 +102,7 @@ let gridSelection=new Set(), gridSelectionContext="", pendingGridReview=null, pe
 let emptyScan=null, emptyScanLoading=false, emptyScanAction=false, emptyScanSequence=0, emptyScanAvailable=true;
 let scanManifestPending=false, scanManifestLoading=false, scanMessage="";
 let assistantConnections=[], assistantProviders=["antigravity"], assistantLoaded=false, assistantLoading=false, assistantAction=false, assistantSequence=0, assistantManifestLoading=false, assistantsAvailable=true;
+let frameRowFilter="", frameRowScrollRequest=null;
 let frameRowGeneration=-1, frameRowCache=new Map(), frameRowsBusy=null, boxRows=[];
 const colors = ["#b2efbc", "#80b9fc"];
 const editingTipsKey="head-body-review:editing-tips:v1";
@@ -111,6 +113,7 @@ function selectSidebarPanel(name) {
     $(`${value}Panel`).hidden=!active; $(`${value}Tab`).classList.toggle("active",active);
     $(`${value}Tab`).setAttribute("aria-selected",String(active)); $(`${value}Tab`).tabIndex=active?0:-1;
   }
+  if(name==="frames" && manifest) renderFrameList(true);
 }
 function setupSidebarGroups() {
   const key="head-body-review:sidebar-groups:v1"; let saved={};
@@ -207,7 +210,7 @@ function fitImage() {
 function updateCursor() {
   canvas.style.cursor=drag?.kind==='pan'?'grabbing':spacePan?'grab':tool==='draw'?'crosshair':'default';
 }
-function refreshProgress() {
+function refreshProgress(followCurrent=false) {
   const counts = {pending:0, approved:0, rejected:0,auto_removed:0};
   manifest.frames.forEach(item => { if(item.status in counts) counts[item.status]++; });
   for (const status of Object.keys(counts)) setText($(status==="auto_removed"?"autoRemovedCount":`${status}Count`),counts[status]);
@@ -217,14 +220,24 @@ function refreshProgress() {
   const source = manifest.source?.path || "Local video";
   setText($("source"),source.split(/[\\/]/).pop()); if($("source").title!==source) $("source").title=source;
   $("running").hidden = manifest.status !== "running";
-  renderFrameList(); renderGrid(); updateButtons();
+  renderFrameList(followCurrent); renderGrid(); updateButtons();
 }
-function renderFrameList() {
-  const container=$("frameList"), items=visibleFrames();
-  if(frameRowGeneration!==recordingSequence) { frameRowGeneration=recordingSequence; frameRowCache.clear(); container.replaceChildren(); }
-  const wanted=new Set(items.map(item=>item.id));
-  for(const child of [...container.children]) if(!wanted.has(child.dataset.frameId)) child.remove();
-  let cursor=container.firstElementChild; const tail=document.createDocumentFragment();
+function renderFrameList(followCurrent=false) {
+  const container=$("frameList"), all=visibleFrames(), step=56, windowSize=80;
+  if(frameRowGeneration!==recordingSequence) { frameRowGeneration=recordingSequence; frameRowCache.clear(); container.replaceChildren(); frameRowFilter=""; }
+  let position=frameRowFilter===currentFilter?container.scrollTop:0; frameRowFilter=currentFilter;
+  const height=container.clientHeight || 560, active=all.findIndex(item=>item.id===currentId);
+  if(followCurrent && active>=0 && (active*step<position || (active+1)*step>position+height)) position=Math.max(0,(active-Math.floor(height/step/2))*step);
+  const start=all.length>windowSize?Math.max(0,Math.min(all.length-windowSize,Math.floor(position/step)-12)):0;
+  const items=all.slice(start,start+windowSize), end=start+items.length, wanted=new Set(items.map(item=>item.id));
+  let top=container.querySelector('[data-frame-spacer="top"]'), bottom=container.querySelector('[data-frame-spacer="bottom"]');
+  if(all.length>windowSize) {
+    if(!top) { top=document.createElement("div"); top.className="frame-list-spacer"; top.dataset.frameSpacer="top"; top.setAttribute("aria-hidden","true"); container.prepend(top); }
+    if(!bottom) { bottom=document.createElement("div"); bottom.className="frame-list-spacer"; bottom.dataset.frameSpacer="bottom"; bottom.setAttribute("aria-hidden","true"); container.append(bottom); }
+    top.style.height=`${start*step}px`; bottom.style.height=`${(all.length-end)*step}px`;
+  } else { top?.remove(); bottom?.remove(); top=bottom=null; }
+  for(const child of [...container.children]) if(child.dataset.frameId && !wanted.has(child.dataset.frameId)) child.remove();
+  let cursor=top?top.nextElementSibling:container.firstElementChild; const tail=document.createDocumentFragment();
   for (const item of items) {
     let row=frameRowCache.get(item.id);
     if(!row) {
@@ -246,12 +259,14 @@ function renderFrameList() {
     else if(cursor) container.insertBefore(row.button,cursor);
     else tail.append(row.button);
   }
-  if(tail.childNodes.length) container.append(tail);
+  if(tail.childNodes.length) container.insertBefore(tail,bottom);
+  if(Math.abs(container.scrollTop-position)>1) container.scrollTop=position;
+  if(frameRowCache.size>windowSize*3) for(const id of frameRowCache.keys()) if(!wanted.has(id)) frameRowCache.delete(id);
   frameRowsBusy=busy;
 }
 function updateFrameRowDisabled() {
   if(frameRowsBusy===busy) return;
-  for(const button of $("frameList").children) if(button.disabled!==busy) button.disabled=busy;
+  for(const button of $("frameList").querySelectorAll(".frame-item")) if(button.disabled!==busy) button.disabled=busy;
   frameRowsBusy=busy;
 }
 function formatTime(value) { return Number.isFinite(value) ? `${Math.floor(value / 60)}:${(value % 60).toFixed(2).padStart(5,"0")}` : "Unknown time"; }
@@ -458,7 +473,7 @@ async function showFrame(id) {
     const flags = Array.isArray(frame.flags) ? frame.flags : [];
     $("flags").textContent = flags.length ? `Review: ${flags.map(flag=>String(flag).replaceAll("_"," ")).join(" · ")}` : ""; $("flags").hidden=!flags.length;
   }
-  renderBoxes(); refreshProgress(); draw();
+  renderBoxes(); refreshProgress(true); draw();
   if (!frame || gridSize!==1) return;
   try {
     const response = await fetch(`/image/${encodeURIComponent(frame.id)}`,{headers:reviewHeaders(recordingId),cache:"no-store"});
@@ -1515,6 +1530,10 @@ document.addEventListener('keyup',event=>{if(event.code==='Space'){spacePan=fals
 window.addEventListener('blur',()=>{spacePan=false;if(drag) finishDrag(null,true);updateCursor();});
 window.addEventListener("resize",fitGridToViewport);
 window.addEventListener("beforeunload",event=>{ if(dirty) { event.preventDefault(); event.returnValue=""; } });
+$("frameList").addEventListener("scroll",()=>{
+  if(frameRowScrollRequest!==null) return;
+  frameRowScrollRequest=requestAnimationFrame(()=>{ frameRowScrollRequest=null; renderFrameList(); });
+});
 setupSidebarGroups(); setupTrainingData(); setTool("select"); showEditingTips(); refreshWorkbench();
 refreshRecordings().finally(async()=>{ await loadManifest(); refreshEmptyScan(); refreshAssistants(); });
 setInterval(refreshWorkbench,3000);
