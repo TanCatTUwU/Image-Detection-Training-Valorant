@@ -1,6 +1,6 @@
 from __future__ import annotations
 import argparse
-from collections import Counter
+from collections import Counter, deque
 import hashlib
 import json
 import math
@@ -36,7 +36,7 @@ class FrameDeduplicator:
 
     def __init__(self):
         self.exact = set()
-        self.signatures = []
+        self.signatures = deque(maxlen=512)
 
     def accept(self, frame):
         digest = hashlib.sha256(np.ascontiguousarray(frame).tobytes()).digest()
@@ -60,24 +60,9 @@ def map_boxes(boxes, region, frame_shape):
     return [{**box, 'x1': (left + box['x1'] * width) / full_width, 'y1': (top + box['y1'] * height) / full_height, 'x2': (left + box['x2'] * width) / full_width, 'y2': (top + box['y2'] * height) / full_height} for box in boxes]
 
 def merge_proposals(boxes):
-    result = []
-    for box in sorted(boxes, key=lambda b: -b['score']):
-        area = (box['x2'] - box['x1']) * (box['y2'] - box['y1'])
-        duplicate = False
-        for old in result:
-            if old['class_id'] != box['class_id']:
-                continue
-            intersection = max(0, min(box['x2'], old['x2']) - max(box['x1'], old['x1'])) * max(0, min(box['y2'], old['y2']) - max(box['y1'], old['y1']))
-            old_area = (old['x2'] - old['x1']) * (old['y2'] - old['y1'])
-            threshold = 0.55 if box['class_id'] == 0 else 0.65
-            if intersection / max(area + old_area - intersection, 1e-12) > threshold:
-                duplicate = True
-                break
-        if not duplicate:
-            result.append(box)
-        if len(result) >= 300:
-            break
-    return result
+    from detection_quality import select_detections
+    selected = select_detections([[b[k] for k in ('x1', 'y1', 'x2', 'y2')] for b in boxes], [b['score'] for b in boxes], ['Head' if b['class_id'] == 0 else 'Body' for b in boxes])
+    return [boxes[index] for index in selected]
 
 class ONNXProposer:
 
@@ -98,7 +83,8 @@ class ONNXProposer:
             valid_shape = raw.ndim == 3 and raw.shape[0] == 1 and (min(raw.shape) > 0) and (raw.shape[2] == 6 if self.model.end_to_end else raw.shape[1] == 4 + len(self.model.names))
             if not valid_shape or not np.issubdtype(raw.dtype, np.floating) or (not np.isfinite(raw).all()):
                 raise ValueError('Strict model output must be finite floating-point detections with a supported nonempty shape')
-        decoded = decode_output(output, geometry, self.model.names, end_to_end=self.model.end_to_end, confidence=self.confidence, head_iou=0.55, return_scores=True)
+        strict = getattr(self, 'strict', False)
+        decoded = decode_output(output, geometry, self.model.names, end_to_end=self.model.end_to_end, confidence=self.confidence, head_iou=.55 if strict else .3, head_geometry=not strict, return_scores=True, quality_filter=not strict)
         return [{'class_id': 0 if name == 'Head' else 1, 'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2, 'score': score} for x1, y1, x2, y2, name, label, score in decoded]
 
     def __call__(self, frame):
@@ -286,6 +272,7 @@ def prepare_video(video_path, output_parent, model_path, *, sample_fps=1, max_im
     dedup, capture = (FrameDeduplicator(), None)
     started = time.perf_counter()
     previous_elapsed = stats.get('elapsed_seconds', 0)
+    checkpoint_interval = max(25, math.ceil(len(times) / 1000))
 
     def report_progress():
         if progress_callback is not None:
@@ -342,7 +329,7 @@ def prepare_video(video_path, output_parent, model_path, *, sample_fps=1, max_im
             manifest['frames'].append({'id': identifier, 'image': image_path, 'label': label_path, 'time_seconds': timestamp, 'decoded_time_seconds': capture.get(cv2.CAP_PROP_POS_MSEC) / 1000, 'split': split, 'width': selected.shape[1], 'height': selected.shape[0], 'source_region': list(region), 'boxes': boxes, 'flags': flags, 'sharpness': round(sharpness, 2), 'status': 'pending', 'revision': 0, 'empty_confirmed': False})
             stats['saved'] += 1
             manifest['next_sample_index'] = index + 1
-            if stats['saved'] == 1 or stats['saved'] % 25 == 0:
+            if stats['saved'] == 1 or stats['saved'] % checkpoint_interval == 0:
                 stats['elapsed_seconds'] = round(previous_elapsed + time.perf_counter() - started, 2)
                 _write_manifest(run, manifest)
                 counts = Counter((f['split'] for f in manifest['frames']))

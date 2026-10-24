@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import yaml
 from PIL import Image
+from training_metrics import TrainingMetrics, valid_epoch
 PROJECT = Path(__file__).resolve().parent
 IMAGE_SUFFIXES = {'.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff', '.webp'}
 RESERVED = {'con', 'prn', 'aux', 'nul', 'clock$', 'conin$', 'conout$'}
@@ -151,6 +152,15 @@ def positive(value: str) -> int:
         raise argparse.ArgumentTypeError('must be greater than zero')
     return number
 
+def validate_augmentation_options(options):
+    for key, upper in (('mosaic', 1), ('mixup', 1), ('degrees', 180), ('fliplr', 1)):
+        value = options[key]
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value <= upper or not math.isfinite(value):
+            raise ValueError(f'{key} must be a finite number from 0 to {upper}')
+    value = options['patience']
+    if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 1000:
+        raise ValueError('patience must be an integer from 0 to 1000; 0 disables early stopping')
+
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--data', default=str(PROJECT / 'training-data/dataset.yaml'))
@@ -163,9 +173,18 @@ def parse_args(argv=None):
     parser.add_argument('--imgsz', type=positive, default=320)
     parser.add_argument('--workers', type=int, default=0)
     parser.add_argument('--threads', type=positive, default=2)
+    parser.add_argument('--mosaic', type=float, default=0.3)
+    parser.add_argument('--mixup', type=float, default=0)
+    parser.add_argument('--degrees', type=float, default=0)
+    parser.add_argument('--fliplr', type=float, default=0.5)
+    parser.add_argument('--patience', type=int, default=10, help='Epochs without improvement before stopping; 0 disables early stopping')
     parser.add_argument('--name', default='train-head-body')
     parser.add_argument('--export', action='store_true', help='Export the trained candidate to static 320px ONNX on CPU')
     args = parser.parse_args(argv)
+    try:
+        validate_augmentation_options(vars(args))
+    except ValueError as exc:
+        parser.error(str(exc))
     if args.workers < 0 or args.imgsz % 32:
         parser.error('--workers must be nonnegative and --imgsz must be a positive multiple of 32')
     if not re.fullmatch('auto|cpu|cuda(?::\\d+)?', args.device):
@@ -216,18 +235,34 @@ def main(argv=None, *, progress_callback=None) -> int:
         if progress_callback:
             progress_callback({'run_path': str(run), 'message': f'Training on {device}'})
         model = YOLO(str(weights), task='detect')
+        observed_epoch = None
+        best_epoch = None
+        metrics_reader = TrainingMetrics(PROJECT)
         if progress_callback:
 
             def report_epoch(trainer):
-                progress_callback({'epoch': int(trainer.epoch) + 1, 'message': f'Epoch {int(trainer.epoch) + 1}/{args.epochs}'})
+                nonlocal observed_epoch, best_epoch
+                measured = metrics_reader.snapshot(run)
+                epoch = measured['latest']['epoch'] if measured['latest'] else valid_epoch(int(trainer.epoch) + 1)
+                if epoch is None or epoch > args.epochs:
+                    return
+                observed_epoch = epoch
+                best_epoch = valid_epoch(getattr(getattr(trainer, 'stopper', None), 'best_epoch', None)) or best_epoch
+                progress_callback({'epoch': observed_epoch, 'best_epoch': best_epoch, 'message': f'Epoch {observed_epoch}/{args.epochs}'})
             model.add_callback('on_fit_epoch_end', report_epoch)
-        model.train(data=str(resolved_yaml), epochs=args.epochs, batch=args.batch, imgsz=args.imgsz, device=device, workers=args.workers, project=str(run.parent), name=run.name, exist_ok=True, resume=False, pretrained=True, save=True, val=True, plots=False, cache=False, amp=False)
+        model.train(data=str(resolved_yaml), epochs=args.epochs, batch=args.batch, imgsz=args.imgsz, device=device, workers=args.workers, project=str(run.parent), name=run.name, exist_ok=True, resume=False, pretrained=True, save=True, val=True, plots=False, cache=False, amp=False,
+                    mosaic=args.mosaic, mixup=args.mixup, degrees=args.degrees, fliplr=args.fliplr, patience=args.patience)
         best = run / 'weights/best.pt'
         if not best.is_file():
             raise ValueError(f'Training did not produce a best checkpoint: {best}')
         print(f'Trained candidate: {best}')
         if progress_callback:
-            progress_callback({'checkpoint': str(best), 'epoch': args.epochs})
+            trainer = getattr(model, 'trainer', None)
+            trainer_epoch = getattr(trainer, 'epoch', None)
+            measured = metrics_reader.snapshot(run)
+            final_epoch = (measured['latest']['epoch'] if measured['latest'] else None) or (valid_epoch(trainer_epoch + 1) if isinstance(trainer_epoch, int) else None) or observed_epoch or args.epochs
+            best_epoch = valid_epoch(getattr(getattr(trainer, 'stopper', None), 'best_epoch', None)) or best_epoch or measured['best_epoch']
+            progress_callback({'checkpoint': str(best), 'epoch': final_epoch, 'best_epoch': best_epoch, 'stopped_early': final_epoch < args.epochs})
         if args.export:
             destination = best.with_suffix('.onnx')
             if destination.exists():

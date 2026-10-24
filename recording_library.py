@@ -39,6 +39,8 @@ def _recording_entry(run):
             raise ValueError('Recording frame directory leaves the run')
     seen = set()
     counts = {'approved': 0, 'rejected': 0}
+    approved_splits = {'train': 0, 'val': 0}
+    backgrounds = 0
     for frame in data['frames']:
         if not isinstance(frame, dict) or not isinstance(frame.get('id'), str) or (not FRAME_ID.fullmatch(frame['id'])) or (frame['id'] in seen) or (frame.get('status') not in ('pending', 'approved', 'rejected', 'auto_removed')) or (frame.get('split') not in ('train', 'val')) or (type(frame.get('revision')) is not int) or (frame['revision'] < 0) or (type(frame.get('empty_confirmed')) is not bool) or (frame.get('width') != 640) or (frame.get('height') != 448) or (not isinstance(frame.get('boxes'), list)):
             raise ValueError('Recording contains an invalid review frame')
@@ -62,11 +64,14 @@ def _recording_entry(run):
             raise ValueError('Automatically removed frames must remain empty and unconfirmed')
         if frame['status'] in counts:
             counts[frame['status']] += 1
+        if frame['status'] == 'approved':
+            approved_splits[frame['split']] += 1
+            backgrounds += int(not frame['boxes'] and frame['empty_confirmed'])
     source = data.get('source', {})
     if not isinstance(source, dict):
         raise ValueError('Recording source metadata must be an object')
     source_name = Path(str(source.get('path', ''))).name
-    return dict(id=recording_id(run), label=f'{source_name} · {run.name}' if source_name else run.name, path=str(run), status=data['status'], frames=len(data['frames']), approved=counts['approved'], rejected=counts['rejected'], source_name=source_name)
+    return dict(id=recording_id(run), label=f'{source_name} · {run.name}' if source_name else run.name, path=str(run), status=data['status'], frames=len(data['frames']), approved=counts['approved'], rejected=counts['rejected'], approved_train=approved_splits['train'], approved_val=approved_splits['val'], approved_backgrounds=backgrounds, source_name=source_name)
 
 def _validate_metadata(metadata):
     if not isinstance(metadata, dict) or (metadata.get('width'), metadata.get('height')) not in ((1280, 882), (1280, 720)):
@@ -87,8 +92,8 @@ def _options(payload):
         value = values[key]
         if type(value) not in (int, float) or not math.isfinite(value) or (not minimum <= value <= maximum):
             raise ValueError(f'{key} must be a finite number from {minimum} to {maximum}')
-    if type(values['max_images']) is not int or not 2 <= values['max_images'] <= 5000:
-        raise ValueError('max_images must be an integer from 2 to 5000')
+    if type(values['max_images']) is not int or not 2 <= values['max_images'] <= 128000:
+        raise ValueError('max_images must be an integer from 2 to 128000')
     if type(values['tiles']) is not bool:
         raise ValueError('tiles must be true or false')
     if not isinstance(values.get('selection_id'), str) or not SELECTION_ID.fullmatch(values['selection_id']):

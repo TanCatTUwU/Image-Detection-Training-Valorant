@@ -617,6 +617,27 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                     recording_stores[root] = ReviewStore(root)
                 return recording_stores[root]
 
+        def _training(self, payload):
+            options = dict(payload)
+            if 'recording_ids' not in options:
+                if 'validation_recording_ids' in options:
+                    raise ValueError('Select training recordings before choosing a validation holdout')
+                return get_workbench().start_training(options, self._store().export_reviewed)
+            from training_dataset import export_recordings, validate_recording_selection
+            selected = options.pop('recording_ids')
+            validation = options.pop('validation_recording_ids', [])
+            validate_recording_selection(selected, validation)
+            library = get_recordings()
+            sources = []
+            for rid in selected:
+                root = Path(library.resolve(rid)).resolve()
+                with stores_lock:
+                    if root not in recording_stores:
+                        recording_stores[root] = ReviewStore(root)
+                    sources.append((rid, recording_stores[root]))
+            board = get_workbench()
+            return board.start_training(options, lambda: export_recordings(getattr(board, 'project', PROJECT), sources, validation))
+
         def do_GET(self):
             try:
                 route, _ = self._route()
@@ -710,7 +731,7 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                 if route == '/api/frames/review':
                     return self._send(200, self._store().review_frames(payload))
                 if route == '/api/training/start':
-                    return self._send(200, get_workbench().start_training(payload, self._store().export_reviewed))
+                    return self._send(200, self._training(payload))
                 if route == '/api/models/select':
                     return self._send(200, get_workbench().select_model(selected_id(payload)))
                 if route == '/api/models/browse':

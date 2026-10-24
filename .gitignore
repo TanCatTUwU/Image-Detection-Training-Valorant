@@ -6,6 +6,7 @@ runtime-env/
 export-env/
 .env
 .env.*
+assistant-connection*.json
 *.pem
 *.key
 *.pt
@@ -33,6 +34,7 @@ training-data/
 training-runs/
 model-library/
 training-jobs/
+training-exports/
 video-jobs/
 empty-scan-jobs/
 tests/

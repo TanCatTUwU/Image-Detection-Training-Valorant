@@ -12,10 +12,12 @@ import traceback
 from datetime import datetime, timezone
 from pathlib import Path
 from model_registry import ModelRegistry, atomic_json, file_lock, process_alive, read_json, utc_now
+from training_metrics import TrainingMetrics, valid_epoch
 PROJECT = Path(__file__).resolve().parent
 ACTIVE_STATES = {'queued', 'running', 'exporting'}
 DEFAULTS = dict(epochs=30, batch=4, imgsz=320, model_width=320, model_height=320,
-                workers=0, threads=2, device='cpu', name='train-head-body', auto_activate=True)
+                workers=0, threads=2, device='cpu', name='train-head-body', auto_activate=True,
+                mosaic=0.3, mixup=0, degrees=0, fliplr=0.5, patience=10)
 RESERVED = {'con', 'prn', 'aux', 'nul', 'clock$', 'conin$', 'conout$'}
 RESERVED.update((f'{prefix}{number}' for prefix in ('com', 'lpt') for number in '123456789¹²³'))
 
@@ -34,6 +36,8 @@ def validate_options(payload, registry):
         value = options[key]
         if isinstance(value, bool) or not isinstance(value, int) or (not lower <= value <= upper):
             raise ValueError(f'{key} must be an integer from {lower} to {upper}')
+    from train_model import validate_augmentation_options
+    validate_augmentation_options(options)
     if any(options[key] % 32 for key in ('imgsz', 'model_width', 'model_height')):
         raise ValueError('Image size, model width and model height must be multiples of 32')
     if options['device'] != 'cpu':
@@ -58,9 +62,15 @@ def prepared_environment(project, threads=2):
     env['PATH'] = str(project / 'runtime-env/Scripts') + os.pathsep + env.get('PATH', '')
     return env
 
-def _public_job(job):
+def _public_job(job, project=None, metrics=None):
     keys = ('id', 'state', 'epoch', 'epochs', 'progress', 'message', 'model_id', 'run_path')
     result = {key: job.get(key) for key in keys}
+    project = Path(project or job['project'])
+    metrics = metrics or TrainingMetrics(project)
+    result['metrics'] = metrics.snapshot(job.get('run_path'), stopped_early=job.get('stopped_early', False), best_epoch=job.get('best_epoch'))
+    result['log_tail'] = ''
+    if job.get('state') not in {'completed', 'failed', 'interrupted'}:
+        return result
     log = Path(job['log_path'])
     try:
         with log.open('rb') as stream:
@@ -86,6 +96,7 @@ class TrainingBoard:
         from model_inference import HardwareMonitor
         self.model_imports = LocalModelImport(self.project, self.registry, self.python)
         self.hardware = HardwareMonitor()
+        self.metrics = TrainingMetrics(self.project)
 
     def _prepare(self):
         if self.root.is_symlink() or self.root.resolve().parent != self.project:
@@ -124,7 +135,7 @@ class TrainingBoard:
             devices.append({'id': capabilities['device'], 'label': capabilities['label']})
         for model in models:
             model['inference'] = choose_inference(model['path'], capabilities) if capabilities is not None else {'backend': 'checking', 'label': 'Checking hardware…', 'device': None}
-        return dict(options=dict(defaults=dict(DEFAULTS), devices=devices, checkpoints=self.registry.checkpoints()), models=models, active_model_id=next((entry['id'] for entry in models if entry['is_active']), None), training=_public_job(job) if job else None, model_import=self.model_imports.snapshot())
+        return dict(options=dict(defaults=dict(DEFAULTS), devices=devices, checkpoints=self.registry.checkpoints()), models=models, active_model_id=next((entry['id'] for entry in models if entry['is_active']), None), training=_public_job(job, self.project, self.metrics) if job else None, model_import=self.model_imports.snapshot())
 
     def _console(self, script, mode, manifest, *, threads=2):
         if not self.python.is_file():
@@ -182,7 +193,7 @@ class TrainingBoard:
                 job.update(state='failed', message=f'Could not launch training console: {exc}', failure_stage='launch')
                 atomic_json(manifest, job)
                 raise ValueError(job['message']) from exc
-        return _public_job(job)
+        return _public_job(job, self.project, self.metrics)
 
     def select_model(self, model_id):
         return self.registry.select(model_id)
@@ -215,7 +226,7 @@ def _train(job, update):
     from train_model import main
     options = job['options']
     arguments = ['--data', job['data'], '--weights', job['checkpoint'], '--device', options['device'], '--name', job['id']]
-    for key in ('epochs', 'batch', 'imgsz', 'workers', 'threads'):
+    for key in ('epochs', 'batch', 'imgsz', 'workers', 'threads', 'mosaic', 'mixup', 'degrees', 'fliplr', 'patience'):
         value = max(options[key], options.get('model_width', 320), options.get('model_height', 320)) if key == 'imgsz' else options[key]
         arguments += ['--' + key, str(value)]
     result = {}
@@ -225,7 +236,7 @@ def _train(job, update):
             result['run_path'] = event['run_path']
         if 'checkpoint' in event:
             result['checkpoint'] = event['checkpoint']
-        fields = {key: event[key] for key in ('epoch', 'run_path', 'message') if key in event}
+        fields = {key: event[key] for key in ('epoch', 'run_path', 'message', 'stopped_early', 'best_epoch') if key in event}
         if 'epoch' in fields:
             fields['progress'] = min(90, 90 * fields['epoch'] / options['epochs'])
         update(**fields)
@@ -287,7 +298,13 @@ def run_training_job(manifest, *, registry=None, trainer=None, exporter=None, va
                             raise ValueError('Training did not produce a best checkpoint')
                         stage = 'export'
                         width, height = options['model_width'], options['model_height']
-                        update(state='exporting', epoch=job['epochs'], progress=92, run_path=str(checkpoint.parent.parent), message=f'PT checkpoint saved; exporting {width} × {height} ONNX')
+                        run_path = str(checkpoint.parent.parent)
+                        measured = TrainingMetrics(project).snapshot(run_path)
+                        final_epoch = (measured['latest']['epoch'] if measured['latest'] else None) or valid_epoch(job.get('epoch')) or job['epochs']
+                        stopped_early = bool(job.get('stopped_early')) or final_epoch < job['epochs']
+                        update(state='exporting', epoch=final_epoch, stopped_early=stopped_early,
+                               best_epoch=valid_epoch(job.get('best_epoch')) or measured['best_epoch'],
+                               progress=92, run_path=run_path, message=f'PT checkpoint saved; exporting {width} × {height} ONNX')
                         if exporter is None:
                             exported = Path(_export(checkpoint, checkpoint.with_suffix('.onnx'), width=width, height=height)).resolve()
                         else:

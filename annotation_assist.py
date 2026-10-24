@@ -318,8 +318,10 @@ def separate_washed_out_heads(pixels, boxes):
     return (actual, estimates)
 
 def assist_proposals(proposer, pixels, boxes, data, frame):
+    from prepare_dataset import merge_proposals
     anchors, _ = separate_washed_out_heads(pixels, frame['boxes'])
     actual, passes = focused_rescan(proposer, pixels, boxes, anchors)
+    actual = merge_proposals(actual)
     actual, washed_out = separate_washed_out_heads(pixels, actual)
     context = _combine(anchors, actual)
     pairs, ambiguous = pair_parts(context)

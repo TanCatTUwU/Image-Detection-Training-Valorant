@@ -76,7 +76,7 @@ def filter_head_detections(detections, frame_shape):
     bodies = [box for box in detections if box[4].casefold() == 'body']
     return [box for box in detections if box[4].casefold() != 'head' or _plausible_head(box, bodies, width, height)]
 
-def decode_output(output, geometry, names, *, end_to_end=False, confidence=0.25, iou=0.7, head_iou=None, head_geometry=False, return_scores=False, head_confidence=None):
+def decode_output(output, geometry, names, *, end_to_end=False, confidence=0.25, iou=0.7, head_iou=None, head_geometry=False, return_scores=False, head_confidence=None, quality_filter=False):
     output = np.asarray(output)
     minimum = min(confidence, head_confidence) if head_confidence is not None else confidence
     if output.ndim != 3 or output.shape[0] != 1:
@@ -108,6 +108,19 @@ def decode_output(output, geometry, names, *, end_to_end=False, confidence=0.25,
     valid = (boxes[:, 2] > boxes[:, 0]) & (boxes[:, 3] > boxes[:, 1])
     boxes, scores, classes = (boxes[valid], scores[valid], classes[valid])
     order = np.argsort(-scores, kind='stable')[:3000]
+    if quality_filter:
+        if head_geometry:
+            head = np.array([names[int(c)].casefold() == 'head' for c in classes[order]], dtype=bool)
+            sizes = boxes[order, 2:] - boxes[order, :2]
+            order = order[~head | ((sizes[:, 0] >= .45 * sizes[:, 1]) & (sizes[:, 0] <= 2 * sizes[:, 1]))]
+        candidates = set()
+        for class_id in np.unique(classes[order]):
+            indices = order[classes[order] == class_id]
+            rects = boxes[indices].copy()
+            rects[:, 2:] -= rects[:, :2]
+            selected = cv2.dnn.NMSBoxes(rects.tolist(), scores[indices].tolist(), 0.0, .95)
+            candidates.update(indices[np.asarray(selected, dtype=int).ravel()].tolist())
+        order = np.asarray([index for index in order if index in candidates][:512], dtype=int)
     if head_geometry:
         is_head = np.array([names[int(c)].casefold() == 'head' for c in classes[order]], dtype=bool)
         bodies = boxes[order[[names[int(c)].casefold() == 'body' for c in classes[order]]]]
@@ -123,7 +136,11 @@ def decode_output(output, geometry, names, *, end_to_end=False, confidence=0.25,
         accepted = np.ones(len(order), dtype=bool)
         accepted[is_head] = plausible
         order = order[accepted]
-    if end_to_end:
+    if quality_filter:
+        from detection_quality import select_detections
+        selected = select_detections(boxes[order], scores[order], [names[int(classes[index])] for index in order], iou=min(iou, .65), head_iou=.3 if head_iou is None else head_iou)
+        keep = order[selected].tolist()
+    elif end_to_end:
         keep = order[:300]
     else:
         selected = set()
@@ -200,5 +217,5 @@ class DirectMLDetector:
         selected, region = detection_view(frame, view)
         tensor, geometry = prepare_frame(selected, self.input_size)
         output = self.session.run(None, {self.input_name: tensor})[0]
-        detections = decode_output(output, geometry, self.names, end_to_end=self.end_to_end, head_iou=0.3, head_geometry=True, head_confidence=self.head_confidence)
+        detections = decode_output(output, geometry, self.names, end_to_end=self.end_to_end, head_iou=0.3, head_geometry=True, head_confidence=self.head_confidence, quality_filter=True)
         return remap_detections(detections, region, frame.shape)
