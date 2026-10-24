@@ -298,7 +298,8 @@ def prepare_video(video_path, output_parent, model_path, *, sample_fps=1, max_im
                 raise ValueError(f"Cannot restore saved image: {item['image']}")
             dedup.accept(existing)
         if proposer is None:
-            proposer = ONNXProposer(model_path, device_id, confidence, tiles)
+            from model_inference import create_proposer
+            proposer = create_proposer(model_path, device_id, confidence, tiles)
         capture = _open_video(video_path)
         cursor = manifest['next_sample_index']
         if cursor:

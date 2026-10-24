@@ -36,24 +36,31 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid #4b5564;border-
 .grid-picture img{object-fit:contain}@media(min-width:761px){.grid-picture{height:var(--grid-preview-height,auto);aspect-ratio:auto}}
 .review-controls{margin-bottom:12px}.review-controls .view-tools{border-bottom:0}.view-tools .nav{margin-left:auto;white-space:nowrap}.canvas-top label{font-size:12px;color:var(--muted)}.canvas-top select{padding:4px 7px}#rejectAutoRemoved{margin:0 0 12px;text-align:left}
 .grid-review-tools{display:flex;align-items:center;flex-wrap:wrap;gap:7px;padding:8px 10px;border-top:1px solid var(--line);background:#20242a}.grid-review-tools output{font-size:12px;color:var(--muted);min-width:76px}.grid-review-tools button{padding:5px 9px;font-size:12px}.grid-check{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;flex-shrink:0;border:1px solid #5d6878;border-radius:3px;color:transparent;font-size:11px}.grid-caption strong{margin-right:auto}.grid-card.selected{border-color:#b6c8e1;box-shadow:inset 0 0 0 1px #b6c8e1;background:#293443}.grid-card.selected .grid-check{background:#c9d2df;border-color:#c9d2df;color:#171b21}
+
+.box-row small{max-width:58%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.assistant-panel{flex-shrink:0;border:1px solid var(--line);border-radius:5px;padding:9px;margin:0 0 12px;background:#1b2027;min-width:0}.assistant-heading{display:flex;align-items:center;justify-content:space-between;gap:7px}.assistant-heading h2{margin:0;font-size:12px}.assistant-heading button{font-size:10px;padding:4px 6px}.assistant-panel>.help{font-size:10px;margin:5px 0 0}.assistant-connections{max-height:224px;overflow:auto;overscroll-behavior:contain}.assistant-connection{margin-top:9px;padding-top:8px;border-top:1px solid var(--line);font-size:10px;min-width:0}.assistant-connection-title{display:flex;align-items:flex-start;justify-content:space-between;gap:6px}.assistant-connection-title strong{font-size:11px;overflow-wrap:anywhere}.assistant-connection-title button{font-size:10px;padding:2px 5px;flex-shrink:0}.assistant-connection p{margin:3px 0;color:var(--muted);overflow-wrap:anywhere}.assistant-usage-row{margin-top:7px}.assistant-usage-label{display:flex;align-items:baseline;justify-content:space-between;gap:6px;color:#c7d0dc}.assistant-usage-label span{min-width:0;overflow-wrap:anywhere}.assistant-usage-label strong{font-weight:500;white-space:nowrap;font-variant-numeric:tabular-nums}.assistant-usage-track{height:3px;background:#343a45;border-radius:3px;overflow:hidden;margin:3px 0}.assistant-usage-track span{display:block;height:100%;background:#99acc6}.assistant-usage-reset{font-size:9px;color:var(--muted)}.assistant-dialog{width:610px}.assistant-dialog label{display:block;color:var(--muted);font-size:12px;margin:14px 0 5px}.assistant-dialog input,.assistant-dialog select,.assistant-dialog textarea{width:100%}.assistant-dialog textarea{display:block;resize:vertical;min-height:116px;max-height:230px;padding:10px;background:#12161c;color:#c8d3e2;border:1px solid #465060;border-radius:4px;font:11px/1.6 ui-monospace,monospace;overflow-wrap:anywhere;white-space:pre-wrap}.assistant-dialog textarea:focus-visible{outline:2px solid #a9bbd4;outline-offset:2px}.assistant-copy-row{display:flex;gap:7px;align-items:center;justify-content:space-between;margin-top:7px}.assistant-copy-row .help{margin:0}.assistant-one-time{color:var(--amber)!important}.assistant-message{font-size:11px;color:var(--muted);overflow-wrap:anywhere;margin:7px 0 0}.assistant-message.error{color:#f0aaa2}@media(max-width:760px){.assistant-panel{margin:0 0 12px}.assistant-connections{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:10px;max-height:210px}.assistant-connection{margin-top:7px}.assistant-dialog{padding:18px}.assistant-copy-row{align-items:flex-start;flex-wrap:wrap}}
+
+.model-import-dialog{width:470px}.model-import-source{padding:10px 11px;background:#14181e;border:1px solid var(--line);border-radius:5px;margin:14px 0 12px;overflow-wrap:anywhere}.model-import-source strong{display:block;font-size:13px}.model-import-source small{display:block;margin-top:3px;color:var(--muted);font-size:11px;overflow-wrap:anywhere}.model-import-dialog label{font-size:12px;color:var(--muted)}.model-import-target{display:flex;flex-direction:column;gap:5px;margin:12px 0}.model-import-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:12px 0}.model-import-grid label{display:flex;flex-direction:column;gap:5px}.model-import-dialog .training-toggle{color:var(--ink)}.model-import-status{width:100%;display:flex;align-items:baseline;gap:7px;padding-top:7px;border-top:1px solid var(--line);font-size:11px;overflow-wrap:anywhere}.model-import-status strong{font-weight:500;flex-shrink:0}.model-import-status span{color:var(--muted)}.model-import-status[data-state="failed"] strong,.model-import-status[data-state="failed"] span{color:#f0aaa2}.model-import-status[data-state="completed"] strong{color:var(--green)}@media(max-width:760px){.model-import-dialog{padding:18px}.model-import-status{align-items:flex-start;flex-direction:column;gap:3px}.model-bar #browseModel,.model-bar #convertModel{flex:1}}
 </style>
 </head>
 <body>
 <header><div class="brand">Dataset review <span>Head / Body</span></div><div class="local">Local <button id="reload" class="small">Reload</button></div></header>
 <div class="layout">
-<aside id="reviewSidebar" aria-label="Review navigation"><nav class="sidebar-nav" role="tablist" aria-label="Sidebar sections"><button id="framesTab" type="button" role="tab" aria-controls="framesPanel" aria-selected="true" class="active">Frames</button><button id="recordingsTab" type="button" role="tab" aria-controls="recordingsPanel" aria-selected="false" tabindex="-1">Recordings</button></nav><section id="framesPanel" class="sidebar-panel" role="tabpanel" aria-labelledby="framesTab"><h2>Review progress</h2><div id="source" class="source muted">Loading recording…</div><div class="progress"><div id="progressBar"></div></div><div id="progressText" class="muted" style="font-size:11px">—</div><div class="counts"><div><strong id="pendingCount">0</strong><span>Pending</span></div><div><strong id="approvedCount">0</strong><span>Approved</span></div><div><strong id="rejectedCount">0</strong><span>Rejected</span></div><div><strong id="autoRemovedCount">0</strong><span>Auto removed</span></div></div><label for="filter" class="muted" style="font-size:11px">Frames</label><select id="filter" class="filter"><option value="pending">Pending</option><option value="all">All frames</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="auto_removed">Auto removed</option></select><button id="rejectAutoRemoved" class="small danger" hidden>Reject all auto removed</button><section class="empty-scan-controls" aria-label="Empty frame scan"><button id="startEmptyScan" class="small" disabled title="Checks untouched, unboxed pending frames with the selected model family. Removed frames remain recoverable.">Scan empty frames</button><div id="emptyScanStatus" hidden><div class="scan-heading"><strong id="emptyScanTitle">Empty scan</strong><button id="cancelEmptyScan" class="small" hidden>Cancel</button></div><p id="emptyScanMessage"></p><div class="progress"><div id="emptyScanProgress"></div></div><div id="emptyScanCounts"></div><div id="emptyScanModel"></div></div><p id="emptyScanError" class="workbench-error" role="status" hidden></p></section><div id="frameList" class="frame-list"></div></section><section id="recordingsPanel" class="sidebar-panel" role="tabpanel" aria-labelledby="recordingsTab" hidden><div class="recordings-scroll"><p id="recordingUnavailable" class="help">Loading recordings…</p><section id="recordingBar" class="recording-bar" aria-label="Local recordings" hidden><label for="recordingSelect">Recording</label><select id="recordingSelect" size="9" disabled aria-label="Recordings"><option value="">Current recording</option></select><p id="recordingStatus" class="help">Loading recordings…</p><div id="recordingError" class="workbench-error" role="status" hidden></div></section><section id="preparationStatus" class="job-card" aria-label="Video preparation progress" hidden><div class="job-title"><strong id="preparationTitle">Preparing frames</strong><button id="openPreparedRecording" class="small" hidden>Open recording</button></div><p id="preparationMessage"></p><div class="progress"><div id="preparationProgress"></div></div><div id="preparationCounts" class="model-detail"></div><details><summary class="help">Details and log</summary><div id="preparationPath" class="model-detail"></div><pre id="preparationLog" class="job-log"></pre></details></section></div><div class="recording-footer"><button id="browseVideo" class="small" disabled>Browse video…</button><button id="openPreparation" class="small" disabled>Prepare frames…</button></div></section></aside>
+<aside id="reviewSidebar" aria-label="Review navigation"><nav class="sidebar-nav" role="tablist" aria-label="Sidebar sections"><button id="framesTab" type="button" role="tab" aria-controls="framesPanel" aria-selected="true" class="active">Frames</button><button id="recordingsTab" type="button" role="tab" aria-controls="recordingsPanel" aria-selected="false" tabindex="-1">Recordings</button></nav><section id="framesPanel" class="sidebar-panel" role="tabpanel" aria-labelledby="framesTab"><h2>Review progress</h2><div id="source" class="source muted">Loading recording…</div><div class="progress"><div id="progressBar"></div></div><div id="progressText" class="muted" style="font-size:11px">—</div><div class="counts"><div><strong id="pendingCount">0</strong><span>Pending</span></div><div><strong id="approvedCount">0</strong><span>Approved</span></div><div><strong id="rejectedCount">0</strong><span>Rejected</span></div><div><strong id="autoRemovedCount">0</strong><span>Auto removed</span></div></div><label for="filter" class="muted" style="font-size:11px">Frames</label><select id="filter" class="filter"><option value="pending">Pending</option><option value="all">All frames</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="auto_removed">Auto removed</option></select><button id="rejectAutoRemoved" class="small danger" hidden>Reject all auto removed</button><section class="empty-scan-controls" aria-label="Empty frame scan"><button id="startEmptyScan" class="small" disabled title="Checks untouched, unboxed pending frames with the selected model family. Removed frames remain recoverable.">Scan empty frames</button><div id="emptyScanStatus" hidden><div class="scan-heading"><strong id="emptyScanTitle">Empty scan</strong><button id="cancelEmptyScan" class="small" hidden>Cancel</button></div><p id="emptyScanMessage"></p><div class="progress"><div id="emptyScanProgress"></div></div><div id="emptyScanCounts"></div><div id="emptyScanModel"></div></div><p id="emptyScanError" class="workbench-error" role="status" hidden></p></section><section id="assistantPanel" class="assistant-panel" aria-label="Connected assistants"><div class="assistant-heading"><h2>Assistant</h2><button id="connectAssistant" class="small" type="button">Connect assistant</button></div><p class="help">Pending frames only · Dashed AI boxes</p><div id="assistantConnections" class="assistant-connections"><p class="help">Loading connections…</p></div><p id="assistantMessage" class="assistant-message" role="status" aria-live="polite" hidden></p></section><div id="frameList" class="frame-list"></div></section><section id="recordingsPanel" class="sidebar-panel" role="tabpanel" aria-labelledby="recordingsTab" hidden><div class="recordings-scroll"><p id="recordingUnavailable" class="help">Loading recordings…</p><section id="recordingBar" class="recording-bar" aria-label="Local recordings" hidden><label for="recordingSelect">Recording</label><select id="recordingSelect" size="9" disabled aria-label="Recordings"><option value="">Current recording</option></select><p id="recordingStatus" class="help">Loading recordings…</p><div id="recordingError" class="workbench-error" role="status" hidden></div></section><section id="preparationStatus" class="job-card" aria-label="Video preparation progress" hidden><div class="job-title"><strong id="preparationTitle">Preparing frames</strong><button id="openPreparedRecording" class="small" hidden>Open recording</button></div><p id="preparationMessage"></p><div class="progress"><div id="preparationProgress"></div></div><div id="preparationCounts" class="model-detail"></div><details><summary class="help">Details and log</summary><div id="preparationPath" class="model-detail"></div><pre id="preparationLog" class="job-log"></pre></details></section></div><div class="recording-footer"><button id="browseVideo" class="small" disabled>Browse video…</button><button id="openPreparation" class="small" disabled>Prepare frames…</button></div></section></aside>
 <main><div id="running" class="running" hidden>Preparing frames. Open this recording again when it finishes.</div><div class="heading"><div><h1 id="frameTitle">Loading frames</h1><div id="meta" class="meta"></div></div></div>
-<section id="modelBar" class="model-bar" aria-label="Models and training"><div class="model-label"><label for="modelSelect">Model</label><select id="modelSelect" disabled><option value="">Loading models…</option></select><span id="activeModelBadge" class="pill" hidden>Default</span></div><button id="useModel" class="small" disabled>Use as default</button><button id="downloadOnnx" class="small" disabled>Download .onnx</button><button id="downloadPt" class="small" disabled>Download .pt</button><button id="openTraining" class="small training-open" disabled>Train…</button><p id="workbenchStatus" class="help">Loading models…</p><div id="workbenchError" class="workbench-error" role="status" hidden></div></section>
+<section id="modelBar" class="model-bar" aria-label="Models and training"><div class="model-label"><label for="modelSelect">Model</label><select id="modelSelect" disabled><option value="">Loading models…</option></select><span id="activeModelBadge" class="pill" hidden>Default</span></div><button id="browseModel" class="small" type="button" disabled>Browse model…</button><button id="convertModel" class="small" type="button" disabled>Convert model…</button><button id="useModel" class="small" disabled>Use as default</button><button id="downloadOnnx" class="small" disabled>Download .onnx</button><button id="downloadPt" class="small" disabled>Download .pt</button><button id="openTraining" class="small training-open" disabled>Train…</button><p id="workbenchStatus" class="help">Loading models…</p><div id="workbenchError" class="workbench-error" role="status" hidden></div><div id="modelImportStatus" class="model-import-status" role="status" aria-live="polite" hidden><strong id="modelImportState"></strong><span id="modelImportMessage"></span></div></section>
 <section id="trainingStatus" class="job-card" aria-label="Training progress" hidden><div class="job-title"><strong id="jobTitle">Training</strong><button id="viewTraining" class="small">View options</button></div><p id="jobMessage"></p><div class="progress"><div id="jobProgress"></div></div><details><summary class="help">Details and log</summary><div id="jobPath" class="model-detail"></div><pre id="jobLog" class="job-log"></pre></details><div id="trainingDownloads" class="actions-group" hidden><button id="downloadTrainedOnnx" class="small">Download .onnx</button><button id="downloadTrainedPt" class="small">Download .pt</button></div></section>
 <section id="reviewControls" class="canvas-card review-controls" aria-label="Review tools"><div class="canvas-top"><button id="selectTool" class="active" title="Select, move, resize [V]">Select <kbd>V</kbd></button><button id="drawTool" title="Draw rectangle [D]">Draw <kbd>D</kbd></button><span class="divider"></span><button id="labelsToggle" aria-pressed="false" title="Show class names over the crop">Labels off</button><button id="undo" title="Undo [Ctrl+Z]">Undo</button><button id="delete" title="Delete selected box [Delete]">Delete</button><span id="dirty" class="dirty" hidden>Unsaved</span><span class="divider"></span><label for="gridSize">View</label><select id="gridSize" aria-label="Frames per view"><option value="1">1 frame</option><option value="4">4 frames</option><option value="9">9 frames</option></select></div><div class="view-tools" aria-label="Image view controls"><button id="zoomOut" aria-label="Zoom out">−</button><output id="zoomLevel" aria-live="polite" aria-label="Image zoom">100%</output><button id="zoomIn" aria-label="Zoom in">+</button><button id="zoomReset" title="Fit the complete image">Fit</button><div id="frameNavigation" class="nav"><span id="position" class="muted" style="font-size:12px"></span><button id="previous" title="Previous frame [←]" aria-label="Previous frame">←</button><button id="next" title="Next frame [→]" aria-label="Next frame">→</button></div><div id="gridNavigation" class="nav" hidden><span id="gridPosition" class="muted"></span><button id="gridPrevious" aria-label="Previous grid page">←</button><button id="gridNext" aria-label="Next grid page">→</button></div></div><div id="gridReviewTools" class="grid-review-tools" role="group" aria-label="Review frames on this page" hidden><output id="gridSelectionCount" aria-live="polite" title="Ctrl-click frames to toggle selection. A normal click opens a frame.">0 selected</output><button id="gridApproveSelected" class="primary" disabled>Approve selected</button><button id="gridRejectSelected" class="danger" disabled>Reject selected</button><span class="divider"></span><button id="gridApproveAll" title="Approve all frames on this page" disabled>Approve all</button><button id="gridRejectAll" class="danger" title="Reject all frames on this page" disabled>Reject all</button></div></section><section id="gridView" aria-label="Frame contact sheet" hidden><div id="gridCards" class="grid-cards"></div></section><div id="editor" class="workspace"><section class="canvas-card"><div class="canvas-stage"><canvas id="canvas" width="640" height="448" tabindex="0" aria-label="640 by 448 video crop. Wheel to zoom. Drag empty space, hold Space, or middle-drag to pan. Alt-click cycles overlapping boxes."></canvas></div><div class="canvas-bottom"><span>640 × 448</span><span id="canvasHint">Select a box</span></div><div class="proposal-tools"><button id="suggestBoxes" disabled>Suggest boxes</button><label for="proposalConfidence">Confidence <input id="proposalConfidence" type="number" min="0.05" max="0.95" step="0.05" value="0.25"></label><label><input id="proposalTiles" type="checkbox" checked> Small-object tiles</label><label class="assist-option"><input id="proposalAssist" type="checkbox" checked> Recover missing parts <small>Focused rescans and estimated partner boxes.</small></label></div><div id="proposalPreview" class="proposal-review" hidden><div class="proposal-tools proposal-preview"><span id="proposalSummary"></span><button id="applyProposals" class="small" title="Add model detections only. Review estimates individually below.">Merge unique boxes</button><button id="discardProposals" class="small">Discard preview</button></div><ul id="proposalWarnings" class="proposal-warnings" hidden></ul><p id="estimateHelp" class="estimate-help" hidden>Amber ? boxes are estimates. Review each before use.</p><div id="proposalEstimates" class="estimate-list" hidden></div></div></section>
 <section class="inspect"><div><h2>Add box</h2><div class="legend"><span class="swatch"></span>Head <span class="swatch body" style="margin-left:8px"></span>Body</div><div class="class-tools"><button id="headClass" class="active">Head <kbd>1</kbd></button><button id="bodyClass">Body <kbd>2</kbd></button></div><h2 id="boxCount">0 boxes</h2></div><div id="boxes" class="boxes"></div><div class="selected-controls"><label for="selectedClass" class="muted" style="font-size:11px">Selected box</label><select id="selectedClass" disabled><option value="0">Head</option><option value="1">Body</option></select><div id="coordinates" class="muted" style="font-size:11px">No box selected.</div></div><div id="flags" class="flags"></div></section></div>
 <div id="empty" class="empty" hidden><strong>No frames in this view</strong>Choose another filter to continue.</div>
 <div class="actions"><div class="actions-group"><button id="reject" class="danger">Reject frame</button><button id="save">Save pending</button><button id="restorePending" hidden>Restore to pending</button></div><div class="actions-group"><button id="export" title="Export saved, approved frames from this recording">Export reviewed</button><button id="approve" class="primary">Approve & next</button></div></div><div id="exportHelp" class="help" hidden>Save changes before exporting. Only saved, approved frames are included.</div><div id="notice" class="notice" role="status" aria-live="polite" hidden></div><div id="exportResult" class="export-result"></div>
 </main></div>
+<dialog id="modelImportDialog" class="model-import-dialog" aria-labelledby="modelImportTitle"><div class="dialog-title"><h2 id="modelImportTitle">Import model</h2><button id="closeModelImport" class="small" type="button" aria-label="Close model import">Close</button></div><div class="model-import-source"><strong id="pickedModelName"></strong><small id="pickedModelPath"></small></div><form id="modelImportForm" novalidate><label id="modelConversionTargetLabel" class="model-import-target" for="modelConversionTarget" hidden>Output format<select id="modelConversionTarget"><option value="onnx">ONNX (.onnx)</option><option value="pt">Matching checkpoint (.pt)</option></select></label><p id="modelImportFormatNote"></p><div id="modelImportDimensions" class="model-import-grid" hidden><label for="modelImportWidth">ONNX width<input id="modelImportWidth" type="number" min="64" max="1280" step="32" value="640" required></label><label for="modelImportHeight">ONNX height<input id="modelImportHeight" type="number" min="64" max="1280" step="32" value="448" required></label></div><label id="modelImportAutoLabel" class="training-toggle"><input id="modelImportAutoActivate" type="checkbox" checked><span>Apply automatically</span></label><div id="modelImportError" class="workbench-error" role="alert" hidden></div><div class="actions-group"><button id="startModelImport" class="primary" type="submit">Import model</button></div></form></dialog>
+<dialog id="assistantDialog" class="assistant-dialog" aria-labelledby="assistantDialogTitle"><div class="dialog-title"><h2 id="assistantDialogTitle">Connect assistant</h2><button id="closeAssistant" class="small" type="button" aria-label="Close assistant connection">Close</button></div><form id="assistantForm"><p>Connect an assistant to this recording. Assistant boxes appear as dashed Head and Body boxes in pending frames.</p><label for="assistantProvider">Provider</label><select id="assistantProvider"><option value="antigravity">Antigravity</option></select><label for="assistantName">Connection name</label><input id="assistantName" type="text" maxlength="80" value="Antigravity" autocomplete="off" required><p>Connecting shares API access. Run your assistant when you are ready to process frames and use your provider quota.</p><div id="assistantConnectError" class="workbench-error" role="alert" hidden></div><div class="actions-group"><button id="createAssistant" class="primary" type="submit">Connect assistant</button></div></form><section id="assistantSetup" hidden><p class="assistant-one-time">Copy this configuration now. The connection secret is shown once and cleared when you close this window.</p><label for="assistantConfig">API configuration</label><textarea id="assistantConfig" readonly spellcheck="false" hidden aria-label="One-time assistant API configuration"></textarea><div class="assistant-copy-row"><p class="help">Keep this file private.</p><button id="copyAssistantConfig" class="small" type="button">Copy configuration</button></div><label for="assistantInstructions">Bridge instructions</label><textarea id="assistantInstructions" readonly spellcheck="false" aria-label="Assistant bridge instructions"></textarea><div class="assistant-copy-row"><p class="help">Only your assistant starts model calls.</p><button id="copyAssistantInstructions" class="small" type="button">Copy instructions</button></div><p id="assistantCopyStatus" class="assistant-message" role="status" aria-live="polite"></p></section></dialog>
 <dialog id="gridEmptyDialog"><h2>Approve empty frames?</h2><p id="gridEmptyMessage"></p><div class="actions-group"><button id="cancelGridEmpty">Keep reviewing</button><button id="confirmGridEmpty" class="primary">Approve frames</button></div></dialog>
 <dialog id="emptyDialog"><h2>Approve an empty frame?</h2><p>Check that no Head or Body is visible. This records a confirmed empty training example.</p><div class="actions-group"><button id="cancelEmpty">Keep reviewing</button><button id="confirmEmpty" class="primary">Approve empty frame</button></div></dialog>
 <dialog id="preparationDialog" class="prepare-dialog"><div class="dialog-title"><h2>Prepare a recording</h2><button id="closePreparation" class="small" aria-label="Close preparation options">Close</button></div><p>Sample a local video into draft frames.</p><div class="picked-video"><strong id="pickedVideoName">No video selected</strong><div id="pickedVideoPath" class="model-detail"></div><div id="pickedVideoMetadata" class="model-detail"></div></div><button id="browseAnotherVideo" class="small">Browse another video…</button><p id="preparationModel" class="prepare-model" title="Uses the detailed view of the selected model family when available."></p><form id="preparationForm"><div class="training-grid prepare-grid"><label for="prepareSampleFps">Samples per second<input id="prepareSampleFps" name="sample_fps" type="number" min="0.1" max="10" step="0.1" value="1" required></label><label for="prepareMaxImages">Maximum images<input id="prepareMaxImages" name="max_images" type="number" min="2" max="5000" value="600" required></label><label for="prepareConfidence">Confidence<input id="prepareConfidence" name="confidence" type="number" min="0.05" max="0.95" step="0.05" value="0.25" required></label></div><label class="training-toggle"><input id="prepareTiles" name="tiles" type="checkbox" checked><span>Use small-object tiles for distant heads</span></label><p>Draft frames require review and approval before training.</p><div id="preparationError" class="workbench-error" role="alert"></div><div class="actions-group"><button id="startPreparation" class="primary" type="submit">Prepare frames</button></div></form></dialog>
-<dialog id="trainingDialog" class="training-dialog"><div class="dialog-title"><h2>Train Head / Body</h2><button id="closeTraining" class="small" aria-label="Close training options">Close</button></div><p>Starts a PowerShell window with these settings. Add a local best.pt checkpoint to the application folder before training.</p><form id="trainingForm"><div class="training-grid"><label class="wide" for="trainCheckpoint">Starting checkpoint<select id="trainCheckpoint" name="checkpoint_id" required></select></label><label for="trainDevice">Device<select id="trainDevice" name="device" required></select></label><label for="trainEpochs">Epochs<input id="trainEpochs" name="epochs" type="number" min="1" max="1000" required></label><label for="trainBatch">Batch size<input id="trainBatch" name="batch" type="number" min="1" max="128" required></label><label for="trainModelWidth">Model width<input id="trainModelWidth" name="model_width" type="number" min="64" max="1280" step="32" required></label><label for="trainModelHeight">Model height<input id="trainModelHeight" name="model_height" type="number" min="64" max="1280" step="32" required></label><label for="trainWorkers">Data workers<input id="trainWorkers" name="workers" type="number" min="0" max="8" required></label><label for="trainThreads">CPU threads<input id="trainThreads" name="threads" type="number" min="1" max="32" required></label><label for="trainName">Run name<input id="trainName" name="name" pattern="[a-z0-9][a-z0-9_-]*" maxlength="48" required></label></div><p class="training-options-note">Outputs: .pt checkpoint and .onnx model. Width and height must be multiples of 32. ONNX input size is fixed after export; review images stay 640 × 448.</p><label class="training-toggle"><input id="trainAutoActivate" name="auto_activate" type="checkbox" checked title="Applied after a successful export. Training continues if this tab closes."><span>Make the exported model the default</span></label><p id="trainingSourceNote" class="training-options-note">Training uses the currently selected recording. Save and approve corrections before starting; Start exports its saved, approved frames.</p><div id="trainingError" class="workbench-error" role="alert"></div><div class="actions-group"><button id="startTraining" class="primary" type="submit">Start in PowerShell</button></div></form></dialog>
+<dialog id="trainingDialog" class="training-dialog"><div class="dialog-title"><h2>Train Head / Body</h2><button id="closeTraining" class="small" aria-label="Close training options">Close</button></div><p>Choose a local checkpoint from the model library. Starts PowerShell with these settings.</p><form id="trainingForm"><div class="training-grid"><label class="wide" for="trainCheckpoint">Starting checkpoint<select id="trainCheckpoint" name="checkpoint_id" required></select></label><label for="trainDevice">Device<select id="trainDevice" name="device" required></select></label><label for="trainEpochs">Epochs<input id="trainEpochs" name="epochs" type="number" min="1" max="1000" required></label><label for="trainBatch">Batch size<input id="trainBatch" name="batch" type="number" min="1" max="128" required></label><label for="trainModelWidth">Model width<input id="trainModelWidth" name="model_width" type="number" min="64" max="1280" step="32" required></label><label for="trainModelHeight">Model height<input id="trainModelHeight" name="model_height" type="number" min="64" max="1280" step="32" required></label><label for="trainWorkers">Data workers<input id="trainWorkers" name="workers" type="number" min="0" max="8" required></label><label for="trainThreads">CPU threads<input id="trainThreads" name="threads" type="number" min="1" max="32" required></label><label for="trainName">Run name<input id="trainName" name="name" pattern="[a-z0-9][a-z0-9_-]*" maxlength="48" required></label></div><p class="training-options-note">Outputs: .pt checkpoint and .onnx model. Width and height must be multiples of 32. ONNX input size is fixed after export; review images stay 640 × 448.</p><label class="training-toggle"><input id="trainAutoActivate" name="auto_activate" type="checkbox" checked title="Applied after a successful export. Training continues if this tab closes."><span>Make the exported model the default</span></label><p id="trainingSourceNote" class="training-options-note">Training uses the currently selected recording. Save and approve corrections before starting; Start exports its saved, approved frames.</p><div id="trainingError" class="workbench-error" role="alert"></div><div class="actions-group"><button id="startTraining" class="primary" type="submit">Start in PowerShell</button></div></form></dialog>
 <div id="editingToast" class="editing-toast" role="status" aria-live="polite" hidden><div class="toast-heading"><strong>Editing tips</strong><button id="closeEditingToast" type="button" class="small" aria-label="Dismiss editing tips">Dismiss</button></div><p>Drag a box to move it or a handle to resize. Alt-click cycles overlapping boxes; Alt-drag moves the next candidate. Wheel zooms; drag empty space or hold Space to pan.</p></div>
 <script>
 "use strict";
@@ -68,12 +75,14 @@ let view = {scale:1, x:0, y:0}, spacePan = false;
 let busy = false, loadSequence = 0, dirty = false, currentFilter = "pending";
 let editVersion = 0, proposalSequence = 0, proposal = null, proposing = false;
 let workbench = null, workbenchLoading = false, workbenchAction = false, workbenchGeneration = 0, selectedModelId = "", trainingFormReady = false, modelDownloading = false;
+let modelImportSelection=null, modelImportMode="import", handledModelImportId="";
 let recordingLibrary=null, recordingLibraryLoading=false, recordingAction=false, recordingLibraryGeneration=0;
 let selectedRecordingId="", recordingSequence=0, manifestSequence=0, pickedVideo=null, preparationFormReady=false;
 let gridSize=1, gridPage=0, gridSequence=0, gridLoads=[];
-let gridSelection=new Set(), gridSelectionContext="", pendingGridReview=null;
+let gridSelection=new Set(), gridSelectionContext="", pendingGridReview=null, pendingEmptyReview=null;
 let emptyScan=null, emptyScanLoading=false, emptyScanAction=false, emptyScanSequence=0, emptyScanAvailable=true;
 let scanManifestPending=false, scanManifestLoading=false, scanMessage="";
+let assistantConnections=[], assistantProviders=["antigravity"], assistantLoaded=false, assistantLoading=false, assistantAction=false, assistantSequence=0, assistantManifestLoading=false, assistantsAvailable=true;
 let frameRowGeneration=-1, frameRowCache=new Map(), frameRowsBusy=null, boxRows=[];
 const colors = ["#b2efbc", "#80b9fc"];
 const editingTipsKey="head-body-review:editing-tips:v1";
@@ -130,6 +139,7 @@ function updateButtons() {
   $("previous").disabled = busy || index <= 0; $("next").disabled = busy || index < 0 || index >= list.length - 1;
   $("position").textContent = index < 0 ? "0 frames" : `${index + 1} / ${list.length}`;
   $("dirty").hidden = !dirty;
+  $("connectAssistant").disabled=assistantAction || !assistantsAvailable || !manifest || !["complete","running"].includes(manifest.status);
   for(const id of ["save","reject","approve"]) $(id).hidden=gridSize!==1;
   if(frame?.status==="auto_removed") $("save").hidden=true;
   $("gridSize").disabled=busy || !!drag;
@@ -317,6 +327,7 @@ function renderGrid() {
       if(![box.x1,box.y1,box.x2,box.y2].every(Number.isFinite)) continue;
       const rect=document.createElementNS("http://www.w3.org/2000/svg","rect");
       for(const [name,value] of Object.entries({x:box.x1*640,y:box.y1*448,width:(box.x2-box.x1)*640,height:(box.y2-box.y1)*448,stroke:colors[box.class_id]||colors[0],fill:"none","stroke-width":1.5,"vector-effect":"non-scaling-stroke"})) rect.setAttribute(name,String(value));
+      if(box.assistant) rect.setAttribute("stroke-dasharray","4 3");
       overlay.append(rect);
     }
     picture.append(img,overlay,loading);
@@ -358,7 +369,8 @@ function renderBoxes() {
     if(row.selected!==(selected===index)) { row.selected=selected===index; row.button.classList.toggle("selected",row.selected); }
     setText(row.label,`${index+1} · ${box.class_id===0?"Head":"Body"}`);
     if(row.classId!==box.class_id) { row.classId=box.class_id; row.label.style.color=colors[box.class_id]; }
-    setText(row.score,Number.isFinite(box.score)?`${Math.round(box.score*100)}% draft`:"edited");
+    setText(row.score,box.assistant?`${box.assistant.name || "Assistant"} · AI`:Number.isFinite(box.score)?`${Math.round(box.score*100)}% draft`:"edited");
+    row.score.title=box.assistant?`${box.assistant.name || "Assistant"} · ${box.assistant.provider || "Assistant"} annotation`:"";
   });
   if(added.childNodes.length) $("boxes").append(added);
   if (selected >= 0 && boxes[selected]) {
@@ -375,7 +387,7 @@ function paintBox(box, index, preview = false) {
   const unit=1/view.scale;
   ctx.strokeStyle = colors[box.class_id]; ctx.lineWidth = (selected === index ? 2 : 1.3)*unit;
   ctx.fillStyle = box.class_id === 0 ? "#b2efbc16" : "#80b9fc12"; ctx.fillRect(x,y,w,h);
-  if (preview) ctx.setLineDash([4*unit,3*unit]); ctx.strokeRect(x,y,w,h); ctx.setLineDash([]);
+  if (preview || box.assistant) ctx.setLineDash([4*unit,3*unit]); ctx.strokeRect(x,y,w,h); ctx.setLineDash([]);
   if (showLabels) {
     const label = `${index + 1} ${box.class_id === 0 ? "Head" : "Body"}`; ctx.font = `${11*unit}px system-ui`;
     const labelWidth = ctx.measureText(label).width + 8*unit, labelY = y >= 17*unit ? y - 17*unit : y;
@@ -544,6 +556,136 @@ async function emptyScanCommand(path) {
   } catch(error) { if(generation===recordingSequence) scanMessage=error.message; }
   finally { if(generation===recordingSequence) { emptyScanAction=false; updateEmptyScanControls(); } }
 }
+function assistantMessage(message="",error=false) {
+  $("assistantMessage").textContent=message; $("assistantMessage").hidden=!message; $("assistantMessage").classList.toggle("error",error);
+}
+function assistantDate(value) {
+  if(value===null || value===undefined || value==="") return "Unavailable";
+  const date=new Date(typeof value==="number" && value<1e12?value*1000:value);
+  return Number.isFinite(date.getTime())?date.toLocaleString(undefined,{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}):"Unavailable";
+}
+function assistantStatus(value) {
+  return ({connected:"Connected",waiting:"Waiting for bridge",active:"Active",idle:"Waiting for bridge",offline:"Offline",online:"Online",expired:"Access expired",disconnected:"Disconnected",revoked:"Disconnected",error:"Needs attention"})[value] || "Waiting for bridge";
+}
+function renderAssistants() {
+  $("connectAssistant").disabled=assistantAction || !assistantsAvailable || !manifest || !["complete","running"].includes(manifest.status);
+  const provider=$("assistantProvider"), selectedProvider=provider.value;
+  const choices=assistantProviders.filter(value=>["antigravity","custom"].includes(value));
+  if(JSON.stringify([...provider.options].map(option=>option.value))!==JSON.stringify(choices)) { provider.replaceChildren(); for(const value of choices) { const option=document.createElement("option"); option.value=value; option.textContent=value==="antigravity"?"Antigravity":"Other AI"; provider.append(option); } if(choices.includes(selectedProvider)) provider.value=selectedProvider; }
+  const container=$("assistantConnections"), scroll=container.scrollTop; container.replaceChildren();
+  if(!assistantConnections.length) { const text=document.createElement("p"); text.className="help"; text.textContent=assistantsAvailable?"No assistant connected.":"Assistant connections unavailable."; container.append(text); return; }
+  for(const connection of assistantConnections) {
+    const card=document.createElement("section"); card.className="assistant-connection";
+    const heading=document.createElement("div"); heading.className="assistant-connection-title";
+    const name=document.createElement("strong"); name.textContent=String(connection.name || "Antigravity");
+    const disconnect=document.createElement("button"); disconnect.type="button"; disconnect.className="small"; disconnect.textContent="Disconnect"; disconnect.dataset.assistantDisconnect=connection.id; disconnect.disabled=assistantAction || connection.status==="expired"; disconnect.onclick=()=>disconnectAssistant(connection.id);
+    heading.append(name,disconnect); card.append(heading);
+    const status=document.createElement("p"), processed=Number.isFinite(connection.processed)?connection.processed:null, queued=Number.isFinite(connection.queued)?connection.queued:null;
+    status.textContent=[assistantStatus(connection.status),processed!==null?`${processed} processed`:null,queued?`${queued} queued`:null].filter(Boolean).join(" · "); card.append(status);
+    const seen=document.createElement("p"); seen.textContent=connection.last_seen?`Last seen ${assistantDate(connection.last_seen)}`:"Bridge has not checked in."; card.append(seen);
+    if(connection.last_error) { const error=document.createElement("p"); error.textContent="Assistant reported an issue. Check the bridge."; card.append(error); }
+    const usage=connection.usage, windows=Array.isArray(usage?.windows)?usage.windows:[];
+    const available=windows.filter(window=>typeof window.used_percent==="number" && Number.isFinite(window.used_percent) && window.used_percent>=0 && window.used_percent<=100);
+    for(const window of available) {
+      const row=document.createElement("div"); row.className="assistant-usage-row";
+      const label=document.createElement("div"); label.className="assistant-usage-label";
+      const title=document.createElement("span"), percent=document.createElement("strong"); title.textContent=String(window.label || window.id || "Usage"); percent.textContent=`${Math.round(window.used_percent)}% used`; label.append(title,percent);
+      const track=document.createElement("div"), fill=document.createElement("span"); track.className="assistant-usage-track"; track.setAttribute("role","meter"); track.setAttribute("aria-label",title.textContent); track.setAttribute("aria-valuemin","0"); track.setAttribute("aria-valuemax","100"); track.setAttribute("aria-valuenow",String(window.used_percent)); fill.style.width=`${window.used_percent}%`; track.append(fill);
+      const reset=document.createElement("div"); reset.className="assistant-usage-reset"; reset.textContent=window.reset_at?`Resets ${assistantDate(window.reset_at)}`:"Reset unavailable";
+      row.append(label,track,reset); card.append(row);
+    }
+    if(!available.length || available.length<windows.length) { const unavailable=document.createElement("p"); unavailable.textContent=usage?.loading?"Usage loading…":"Usage unavailable."; card.append(unavailable); }
+    const expired=available.some(window=>{ const reset=new Date(typeof window.reset_at==="number" && window.reset_at<1e12?window.reset_at*1000:window.reset_at); return window.reset_at && Number.isFinite(reset.getTime()) && reset.getTime()<Date.now(); });
+    if(available.length && (usage?.error || usage?.stale || expired)) { const stale=document.createElement("p"); stale.textContent=expired?"Reset time passed; last report shown until refresh.":usage?.stale?"Usage is stale; showing last report.":"Usage refresh unavailable; showing last report."; card.append(stale); }
+    const source=document.createElement("p"); source.textContent=[usage?.source?String(usage.source):null,usage?.updated_at?`Updated ${assistantDate(usage.updated_at)}`:null].filter(Boolean).join(" · "); if(source.textContent) card.append(source);
+    container.append(card);
+  }
+  container.scrollTop=scroll;
+}
+function closeAssistantDialog() {
+  $("assistantConfig").value=""; $("assistantInstructions").value=""; $("assistantConfig").hidden=true; $("assistantSetup").hidden=true; $("assistantForm").hidden=false; $("assistantCopyStatus").textContent="";
+  if($("assistantDialog").open) $("assistantDialog").close();
+}
+function resetAssistants() {
+  assistantSequence++; assistantConnections=[]; assistantLoaded=false; assistantLoading=false; assistantAction=false; assistantManifestLoading=false; assistantsAvailable=true; closeAssistantDialog(); assistantMessage(); renderAssistants();
+}
+async function refreshAssistantManifest() {
+  if(assistantManifestLoading || scanManifestLoading || busy || dirty || drag || proposing || proposal || $("emptyDialog").open || !manifest || (gridSize===1 && frame && !image)) return;
+  const generation=recordingSequence, recordingId=selectedRecordingId, version=editVersion, loading=loadSequence, request=++manifestSequence;
+  assistantManifestLoading=true;
+  try {
+    const loaded=await api("/api/manifest",undefined,recordingId);
+    if(generation!==recordingSequence || request!==manifestSequence || busy || dirty || drag || proposing || proposal || $("emptyDialog").open || version!==editVersion || loading!==loadSequence) return;
+    if(JSON.stringify(loaded)===JSON.stringify(manifest)) return;
+    const previous=frame; manifest=loaded;
+    const list=visibleFrames(), next=list.find(item=>item.id===currentId) || list[0];
+    if(gridSize===1 && next && previous?.id===next.id && previous.status===next.status && JSON.stringify(previous.flags)===JSON.stringify(next.flags) && image) {
+      frame=next; boxes=clone(next.boxes); selected=Math.min(selected,boxes.length-1); history=[]; editVersion++; renderBoxes(); refreshProgress(); draw();
+      const revision=[...$("meta").children].find(node=>node.textContent.startsWith("revision ")); if(revision) revision.textContent=`revision ${next.revision}`;
+    } else if(gridSize!==1 && previous?.id===next?.id) { frame=next || null; boxes=next?clone(next.boxes):[]; refreshProgress(); }
+    else await showFrame(next?.id);
+  } catch(error) { if(generation===recordingSequence) assistantMessage("Annotations could not refresh. Will retry.",true); }
+  finally { if(generation===recordingSequence) assistantManifestLoading=false; }
+}
+async function refreshAssistants() {
+  if(assistantLoading || assistantAction) return;
+  const generation=recordingSequence, recordingId=selectedRecordingId, request=++assistantSequence; assistantLoading=true;
+  try {
+    const result=await api("/api/assistants",undefined,recordingId);
+    if(generation!==recordingSequence || request!==assistantSequence) return;
+    const connections=Array.isArray(result.connections)?result.connections.filter(connection=>!["disconnected","revoked"].includes(connection.status)):[];
+    const providers=Array.isArray(result.providers)?result.providers:["antigravity"];
+    const changed=!assistantLoaded || JSON.stringify(connections)!==JSON.stringify(assistantConnections) || JSON.stringify(providers)!==JSON.stringify(assistantProviders) || !assistantsAvailable;
+    assistantConnections=connections; assistantProviders=providers; assistantLoaded=true; assistantsAvailable=true; assistantMessage(); if(changed || connections.some(connection=>connection.usage?.windows?.some(window=>window.reset_at && new Date(typeof window.reset_at==="number" && window.reset_at<1e12?window.reset_at*1000:window.reset_at).getTime()<Date.now()))) renderAssistants();
+    if(connections.some(connection=>!["revoked","disconnected","expired"].includes(connection.status))) await refreshAssistantManifest();
+  } catch(error) { if(generation===recordingSequence && request===assistantSequence) { if(error.status===404) assistantsAvailable=false; assistantMessage(error.status===404?"Connections unavailable on this server.":"Connections could not refresh. Will retry.",error.status!==404); renderAssistants(); } }
+  finally { if(generation===recordingSequence && request===assistantSequence) { assistantLoading=false; $("connectAssistant").disabled=assistantAction || !assistantsAvailable || !manifest || !["complete","running"].includes(manifest.status); } }
+}
+async function createAssistant(event) {
+  event.preventDefault(); if(assistantAction) return;
+  const provider=$("assistantProvider").value, name=$("assistantName").value.trim(); if(!name) { $("assistantName").focus(); return; }
+  const generation=recordingSequence, recordingId=selectedRecordingId; assistantAction=true; assistantSequence++; $("createAssistant").disabled=true; $("assistantConnectError").hidden=true; renderAssistants();
+  try {
+    const result=await api("/api/assistants/connect",{provider,name},recordingId);
+    if(generation!==recordingSequence) return;
+    if(!result.connection || typeof result.token!=="string" || !result.token || typeof result.api_base!=="string") throw new Error("Invalid connection response");
+    assistantConnections=[...assistantConnections.filter(connection=>connection.id!==result.connection.id),result.connection]; assistantLoaded=true; assistantsAvailable=true;
+    if($("assistantDialog").open) {
+      $("assistantConfig").value=JSON.stringify({api_base:result.api_base,recording_id:result.recording_id,headers:{"X-Assistant-Token":result.token}},null,2);
+      $("assistantInstructions").value=provider==="antigravity"?`Save the copied configuration as assistant-connection.json beside assistant_bridge.py.
+
+Check the connection without model calls:
+python assistant_bridge.py --connection-file assistant-connection.json --check
+
+Process up to four pending frames:
+python assistant_bridge.py --connection-file assistant-connection.json --frames 4
+
+Head = class 0; Body = class 1. Boxes remain pending for review. Protect the configuration secret. Disconnect here to revoke API access.`:`Use api_base and the X-Assistant-Token header from the copied configuration. Never put the secret in a URL.
+
+GET /status to inspect the recording.
+POST /frames with {"limit":4,"cursor":0} to request pending frames.
+Download each returned image_url with the same header.
+POST /boxes with {"frame_id":"frame-000001","revision":0,"boxes":[{"class_id":0,"x1":0.1,"y1":0.1,"x2":0.2,"y2":0.3}]} using that frame's current revision.
+
+Coordinates are normalized from 0 to 1. Head = class 0; Body = class 1. Review conflicts before retrying. Boxes remain pending for human review. POST /heartbeat can report actual usage windows. Disconnect here to revoke API access.`;
+      $("assistantForm").hidden=true; $("assistantSetup").hidden=false; $("assistantConfig").hidden=false; $("assistantDialogTitle").textContent="Assistant connected";
+    }
+    assistantMessage();
+  } catch(error) { if(generation===recordingSequence) { $("assistantConnectError").textContent="Could not create the connection. Try again."; $("assistantConnectError").hidden=false; } }
+  finally { if(generation===recordingSequence) { assistantAction=false; assistantLoading=false; $("createAssistant").disabled=false; renderAssistants(); } }
+}
+async function disconnectAssistant(id) {
+  if(assistantAction) return;
+  const generation=recordingSequence,recordingId=selectedRecordingId; assistantAction=true; assistantSequence++; renderAssistants();
+  try { await api("/api/assistants/disconnect",{connection_id:id},recordingId); if(generation===recordingSequence) { assistantConnections=assistantConnections.filter(connection=>connection.id!==id); assistantMessage("Assistant disconnected."); } }
+  catch(error) { if(generation===recordingSequence) assistantMessage("Could not disconnect the assistant. Try again.",true); }
+  finally { if(generation===recordingSequence) { assistantAction=false; assistantLoading=false; renderAssistants(); } }
+}
+async function copyAssistant(id) {
+  const control=$(id); if(!control.value) return;
+  try { await navigator.clipboard.writeText(control.value); $("assistantCopyStatus").textContent=id==="assistantConfig"?"Configuration copied.":"Instructions copied."; }
+  catch(error) { control.focus(); control.select(); $("assistantCopyStatus").textContent="Text selected. Copy it with Ctrl+C."; }
+}
 function recordingError(message="") { $("recordingError").textContent=message; $("recordingError").hidden=!message; }
 function preparationActive() { return ["queued","running"].includes(recordingLibrary?.preparation?.state); }
 function updateRecordingControls() {
@@ -608,11 +750,11 @@ async function openRecording(id) {
   if(id===selectedRecordingId) { await loadManifest(); return; }
   if(!discardOkay()) { $("recordingSelect").value=selectedRecordingId; return; }
   selectedRecordingId=id; recordingSequence++; manifestSequence++; busy=false;
-  clearGridImages(); resetGridSelection(); gridPage=0; resetEmptyScan();
+  clearGridImages(); resetGridSelection(); gridPage=0; resetEmptyScan(); resetAssistants();
   view={scale:1,x:0,y:0}; manifest={status:"loading",frames:[]};
   $("exportResult").textContent=""; $("emptyDialog").close();
   await showFrame(undefined); $("frameTitle").textContent="Loading recording…";
-  renderRecordings(); await loadManifest(); refreshEmptyScan();
+  renderRecordings(); await loadManifest(); refreshEmptyScan(); refreshAssistants();
 }
 function openPreparation() {
   if(!pickedVideo || !recordingLibrary) return;
@@ -645,6 +787,9 @@ function trainingActive() { return ["queued","running","exporting"].includes(wor
 function updateWorkbenchControls() {
   const ready=!!workbench && !workbenchAction, model=workbench?.models?.find(item=>item.id===selectedModelId);
   $("modelSelect").disabled=!ready || !workbench.models.length;
+  $("browseModel").disabled=!ready || modelImportActive();
+  $("convertModel").disabled=!ready || !model || modelImportActive();
+  $("startModelImport").disabled=!ready || !modelImportSelection || modelImportActive() || (modelImportMode==="convert" && !workbench.models.find(item=>item.id===modelImportSelection.id)?.formats?.includes("pt"));
   $("useModel").disabled=!ready || !model || model.id===workbench.active_model_id;
   for(const format of ["onnx","pt"]) {
     $(format==="onnx"?"downloadOnnx":"downloadPt").disabled=!ready || modelDownloading || !model?.formats?.includes(format);
@@ -682,7 +827,11 @@ function setupTrainingForm(options) {
   trainingFormReady=true;
 }
 function renderWorkbench() {
-  const models=workbench.models||[];
+  const models=workbench.models||[], imported=workbench.model_import;
+  if(imported?.state==="completed" && imported.id!==handledModelImportId && models.some(model=>model.id===imported.model_id)) {
+    handledModelImportId=imported.id;
+    if(imported.auto_activate && workbench.active_model_id===imported.model_id && selectedModelId!==imported.model_id) { selectedModelId=imported.model_id; clearProposals(); draw(); }
+  }
   if(!models.some(model=>model.id===selectedModelId)) {
     selectedModelId=models.find(model=>model.id===workbench.active_model_id)?.id || models[0]?.id || "";
     clearProposals(); draw();
@@ -694,7 +843,7 @@ function renderWorkbench() {
   const model=models.find(item=>item.id===selectedModelId);
   const viewLabel=model?.view?model.view[0].toUpperCase()+model.view.slice(1):"Full";
   const shape=model?.input_shape, dimensions=Array.isArray(shape) && shape.length===4?` · ${shape[3]} × ${shape[2]}`:"";
-  $("workbenchStatus").textContent=model?`${viewLabel} view${dimensions}`:"Place a local best.onnx in the application folder, then refresh.";
+  $("workbenchStatus").textContent=model?`${viewLabel} view${dimensions} · ${model.inference?.label || "Inference backend unavailable"}`:"Browse a local Head/Body .onnx or .pt model to begin.";
   $("workbenchStatus").title=model?.path || ""; $("modelSelect").title=model?.path || "";
   const job=workbench.training; $("trainingStatus").hidden=!job;
   $("trainingDownloads").hidden=job?.state!=="completed";
@@ -707,7 +856,66 @@ function renderWorkbench() {
     $("jobPath").textContent=job.run_path || "";
     $("jobLog").textContent=Array.isArray(job.log_tail)?job.log_tail.join("\n"):String(job.log_tail||"No log output yet.");
   }
-  setupTrainingForm(workbench.options||{}); updateWorkbenchControls();
+  renderModelImportStatus(); setupTrainingForm(workbench.options||{}); updateWorkbenchControls(); fitGridToViewport();
+}
+function modelImportActive() { return ["queued","running","exporting"].includes(workbench?.model_import?.state); }
+function renderModelImportStatus() {
+  const job=workbench?.model_import; $("modelImportStatus").hidden=!job;
+  if(!job) return;
+  $("modelImportStatus").dataset.state=job.state || "queued";
+  const state=({queued:"Queued",running:"Working",exporting:"Exporting",completed:"Complete",failed:"Failed",interrupted:"Interrupted"})[job.state] || "Working";
+  setText($("modelImportState"),`Model import · ${state}`);
+  setText($("modelImportMessage"),job.message || job.error || (job.state==="completed"?"Model is ready.":"Waiting for model import…"));
+}
+function modelImportError(message="") { $("modelImportError").textContent=message; $("modelImportError").hidden=!message; }
+function closeModelImport() { if($("modelImportDialog").open) $("modelImportDialog").close(); modelImportSelection=null; modelImportError(); }
+function updateModelImportDialog() {
+  const selection=modelImportSelection, converting=modelImportMode==="convert", checkpoint=converting && workbench?.models?.find(item=>item.id===selection?.id)?.formats?.includes("pt"), target=$("modelConversionTarget").value;
+  const dimensions=converting?!!checkpoint && target==="onnx":selection?.format==="pt";
+  $("modelConversionTargetLabel").hidden=!converting;
+  $("modelImportDimensions").hidden=!dimensions; $("modelImportAutoLabel").hidden=converting && target==="pt";
+  $("modelImportTitle").textContent=converting?"Convert model":"Import model";
+  $("startModelImport").textContent=converting?(target==="pt"?"Download .pt":"Export ONNX"):"Import model";
+  $("modelImportFormatNote").textContent=converting?(!checkpoint?"ONNX alone cannot reconstruct a trainable PT checkpoint. Exporting another ONNX size also requires the matching PT checkpoint.":target==="pt"?"Retrieve the matching training checkpoint. This downloads the original paired PT file.":"Export a new static ONNX variant from the matching PT checkpoint. Width and height must be multiples of 32."):selection?.format==="pt"?"Use a trusted Ultralytics PT checkpoint. Import also exports static ONNX at the selected dimensions. Width and height must be multiples of 32.":"Uses this ONNX model’s stored input dimensions.";
+  updateWorkbenchControls();
+}
+function showModelImport(selection,mode="import") {
+  modelImportSelection=selection; modelImportMode=mode; modelImportError(); $("modelImportAutoActivate").checked=true;
+  $("pickedModelName").textContent=selection.name || selection.label || "Local model"; $("pickedModelPath").textContent=selection.path || "";
+  const shape=mode==="convert"?selection.input_shape:null;
+  $("modelImportWidth").value=Array.isArray(shape) && Number.isInteger(shape[3])?shape[3]:640; $("modelImportHeight").value=Array.isArray(shape) && Number.isInteger(shape[2])?shape[2]:448;
+  const checkpoint=selection.formats?.includes("pt"); for(const option of $("modelConversionTarget").options) option.disabled=mode==="convert" && !checkpoint;
+  $("modelConversionTarget").value=checkpoint || mode==="import"?"onnx":""; updateModelImportDialog();
+  if(!$("modelImportDialog").open) $("modelImportDialog").showModal();
+}
+async function browseLocalModel() {
+  if(!workbench || workbenchAction || modelImportActive()) return;
+  workbenchAction=true; workbenchGeneration++; workbenchError(); updateWorkbenchControls();
+  try {
+    const picked=await api("/api/models/browse",{}); if(picked.cancelled) return;
+    if(!picked.selection_id || !["onnx","pt"].includes(picked.format)) throw new Error("The selected model could not be read. Choose an ONNX or PT file.");
+    showModelImport(picked);
+  } catch(error) { workbenchError(error.message); }
+  finally { workbenchAction=false; updateWorkbenchControls(); }
+}
+function openModelConversion() {
+  if(workbenchAction || modelImportActive()) return;
+  const model=workbench?.models?.find(item=>item.id===selectedModelId); if(model) showModelImport(model,"convert");
+}
+async function startModelImport(event) {
+  event.preventDefault(); if(!workbench || workbenchAction || modelImportActive() || !modelImportSelection) return;
+  const selection=modelImportSelection, converting=modelImportMode==="convert", target=$("modelConversionTarget").value;
+  modelImportError();
+  if(converting && !workbench.models.find(item=>item.id===selection.id)?.formats?.includes("pt")) return;
+  if(converting && target==="pt") { closeModelImport(); await downloadModel("pt",selection.id); return; }
+  const dimensions=converting || selection.format==="pt", width=dimensions?Number($("modelImportWidth").value):640, height=dimensions?Number($("modelImportHeight").value):448;
+  if(![width,height].every(value=>Number.isInteger(value) && value>=64 && value<=1280 && value%32===0)) { modelImportError("Width and height must be multiples of 32 from 64 to 1280."); return; }
+  const payload={...(converting?{model_id:selection.id}:{selection_id:selection.selection_id}),auto_activate:$("modelImportAutoActivate").checked,model_width:width,model_height:height};
+  workbenchAction=true; workbenchGeneration++; updateWorkbenchControls();
+  try {
+    const job=await api(converting?"/api/models/convert":"/api/models/import",payload); workbench.model_import=job; closeModelImport(); renderWorkbench();
+  } catch(error) { modelImportError(error.message); }
+  finally { workbenchAction=false; updateWorkbenchControls(); }
 }
 async function refreshWorkbench() {
   if(workbenchLoading || workbenchAction) return;
@@ -908,6 +1116,10 @@ function undo() {
   if(restorePreview) proposal=state.proposal;
   setDirty(restorePreview); renderBoxes(); if(restorePreview) renderProposalPreview(); draw();
 }
+$("connectAssistant").onclick=()=>{ closeAssistantDialog(); $("assistantDialogTitle").textContent="Connect assistant"; $("assistantConnectError").hidden=true; $("assistantDialog").showModal(); $("assistantName").focus(); };
+$("assistantForm").onsubmit=createAssistant; $("closeAssistant").onclick=closeAssistantDialog;
+$("assistantDialog").addEventListener("cancel",event=>{ event.preventDefault(); closeAssistantDialog(); });
+$("copyAssistantConfig").onclick=()=>copyAssistant("assistantConfig"); $("copyAssistantInstructions").onclick=()=>copyAssistant("assistantInstructions");
 $("selectTool").onclick=()=>setTool("select"); $("drawTool").onclick=()=>setTool("draw"); $("headClass").onclick=()=>setClass(0); $("bodyClass").onclick=()=>setClass(1);
 $("zoomIn").onclick=()=>zoomTo(view.scale*1.25); $("zoomOut").onclick=()=>zoomTo(view.scale/1.25); $("zoomReset").onclick=fitImage;
 $("labelsToggle").onclick=()=>{ showLabels=!showLabels; $("labelsToggle").setAttribute("aria-pressed",String(showLabels)); $("labelsToggle").textContent=showLabels?"Labels on":"Labels off"; $("labelsToggle").classList.toggle("active",showLabels); draw(); };
@@ -931,8 +1143,14 @@ $("cancelEmptyScan").onclick=()=>emptyScanCommand("/api/empty-scan/cancel");
 $("reload").onclick=loadManifest; $("save").onclick=()=>saveFrame("pending"); $("reject").onclick=()=>saveFrame("rejected",false,true);
 $("restorePending").onclick=()=>saveFrame("pending",false,true);
 $("rejectAutoRemoved").onclick=rejectAllAutoRemoved;
-$("approve").onclick=()=>{ if(!canEdit()) return; if(!boxes.length) $("emptyDialog").showModal(); else saveFrame("approved",false,true); };
-$("cancelEmpty").onclick=()=>$("emptyDialog").close(); $("confirmEmpty").onclick=()=>{ $("emptyDialog").close(); saveFrame("approved",true,true); };
+$("approve").onclick=()=>{ if(!canEdit()) return; if(!boxes.length) { pendingEmptyReview={id:currentId,revision:frame.revision,generation:recordingSequence,version:editVersion}; $("emptyDialog").showModal(); } else saveFrame("approved",false,true); };
+$("cancelEmpty").onclick=()=>{ pendingEmptyReview=null; $("emptyDialog").close(); };
+$("emptyDialog").addEventListener("close",()=>{ pendingEmptyReview=null; });
+$("confirmEmpty").onclick=()=>{
+  const reviewed=pendingEmptyReview; pendingEmptyReview=null; $("emptyDialog").close();
+  if(!reviewed || reviewed.id!==currentId || reviewed.revision!==frame?.revision || reviewed.generation!==recordingSequence || reviewed.version!==editVersion || boxes.length || !canEdit()) { notice("The frame changed while confirmation was open. Review the current boxes before approving.",true); return; }
+  saveFrame("approved",true,true);
+};
 $("export").onclick=async()=>{
   if(dirty) { notice("Save changes before exporting. Only saved, approved frames are included.",true); return; }
   if(busy) return; const generation=recordingSequence, recordingId=selectedRecordingId;
@@ -960,6 +1178,9 @@ $("preparationForm").onsubmit=async event=>{
   catch(error) { $("preparationError").textContent=error.message; }
   finally { recordingAction=false; updateRecordingControls(); }
 };
+$("browseModel").onclick=browseLocalModel; $("convertModel").onclick=openModelConversion;
+$("closeModelImport").onclick=closeModelImport; $("modelImportDialog").addEventListener("cancel",event=>{ event.preventDefault(); closeModelImport(); });
+$("modelConversionTarget").onchange=()=>{ modelImportError(); updateModelImportDialog(); }; $("modelImportForm").onsubmit=startModelImport;
 $("modelSelect").onchange=()=>{ selectedModelId=$("modelSelect").value; clearProposals(); draw(); renderWorkbench(); };
 $("useModel").onclick=async()=>{ const result=await workbenchCommand("/api/models/select",{model_id:selectedModelId}); if(result) { await refreshWorkbench(); notice("Default model updated."); } };
 $("downloadOnnx").onclick=()=>downloadModel("onnx"); $("downloadPt").onclick=()=>downloadModel("pt");
@@ -983,7 +1204,7 @@ $("proposalAssist").onchange=()=>{ clearProposals(); updateWorkbenchControls(); 
 $("discardProposals").onclick=()=>{ clearProposals(); updateWorkbenchControls(); draw(); notice(""); };
 document.addEventListener("keydown",event=>{
   if(event.key==="Escape" && drag) { event.preventDefault(); finishDrag(null,true); return; }
-  if($("gridEmptyDialog").open || $("emptyDialog").open || $("trainingDialog").open || $("preparationDialog").open || /INPUT|SELECT|TEXTAREA/.test(event.target.tagName)) return;
+  if($("modelImportDialog").open || $("assistantDialog").open || $("gridEmptyDialog").open || $("emptyDialog").open || $("trainingDialog").open || $("preparationDialog").open || /INPUT|SELECT|TEXTAREA/.test(event.target.tagName)) return;
   if(event.code==='Space' && document.activeElement===canvas && image) { event.preventDefault(); spacePan=true; updateCursor(); return; }
   if(drag) return;
   if(gridSize!==1) { if(event.key==="ArrowLeft" || event.key==="ArrowRight") { event.preventDefault(); $(event.key==="ArrowLeft"?"gridPrevious":"gridNext").click(); } return; }
@@ -999,10 +1220,11 @@ window.addEventListener('blur',()=>{spacePan=false;if(drag) finishDrag(null,true
 window.addEventListener("resize",fitGridToViewport);
 window.addEventListener("beforeunload",event=>{ if(dirty) { event.preventDefault(); event.returnValue=""; } });
 setTool("select"); showEditingTips(); refreshWorkbench();
-refreshRecordings().finally(async()=>{ await loadManifest(); refreshEmptyScan(); });
+refreshRecordings().finally(async()=>{ await loadManifest(); refreshEmptyScan(); refreshAssistants(); });
 setInterval(refreshWorkbench,3000);
 setInterval(refreshRecordings,3000);
 setInterval(refreshEmptyScan,3000);
+setInterval(refreshAssistants,3000);
 </script>
 </body>
 </html>

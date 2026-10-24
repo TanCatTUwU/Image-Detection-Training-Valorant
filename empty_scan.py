@@ -289,8 +289,8 @@ def run_empty_scan(manifest, *, registry=None, store_factory=None, proposer_fact
                     if Path(store.root).resolve() != Path(job['run_path']).resolve():
                         raise ValueError('The scan store belongs to another recording')
                     if proposer_factory is None:
-                        from prepare_dataset import ONNXProposer
-                        proposer_factory = ONNXProposer
+                        from model_inference import create_proposer
+                        proposer_factory = create_proposer
                     proposer = proposer_factory(Path(model['path']), 0, CONFIDENCE, True, strict=True)
                     if image_reader is None:
                         import cv2

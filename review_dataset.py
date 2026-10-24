@@ -16,13 +16,17 @@ from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
+from assistant_api import AssistantConflict, AssistantHub, AssistantUnauthorized, validate_assistant
 PROJECT = Path(__file__).resolve().parent
 MAX_BODY = 1024 * 1024
 FRAME_ID = re.compile('frame-[0-9]{6,12}\\Z')
 STATUSES = {'pending', 'approved', 'rejected', 'auto_removed'}
 MANUAL_STATUSES = {'pending', 'approved', 'rejected'}
 
-class RevisionConflict(ValueError):
+class RevisionConflict(AssistantConflict):
+    pass
+
+class ReviewBusy(TimeoutError):
     pass
 
 def validate_boxes(boxes):
@@ -44,6 +48,8 @@ def validate_boxes(boxes):
             if type(score) not in (int, float) or not math.isfinite(score) or (not 0 <= score <= 1):
                 raise ValueError('Box score must be a finite number in 0..1')
             clean['score'] = score
+        if 'assistant' in box:
+            clean['assistant'] = validate_assistant(box['assistant'])
         result.append(clean)
     return result
 
@@ -110,7 +116,7 @@ class ReviewStore:
                         break
                     except OSError:
                         if time.monotonic() >= deadline:
-                            raise ValueError('Another reviewer is saving; try again')
+                            raise ReviewBusy('Another reviewer is saving; try again')
                         time.sleep(0.05)
                 try:
                     yield
@@ -234,6 +240,64 @@ class ReviewStore:
                     atomic_write(label, old_label)
                 raise
             return copy.deepcopy(frame)
+
+    def merge_assistant(self, frame_id, revision, boxes, request_key, fingerprint):
+        boxes = validate_boxes(boxes)
+        with self._locked():
+            snapshot = self._manifest_snapshot(clone=False)
+            self._complete(snapshot)
+            receipts = snapshot.get('assistant_receipts', {})
+            if not isinstance(receipts, dict):
+                raise ValueError('Invalid assistant submission receipts')
+            receipt = receipts.get(request_key)
+            if receipt is not None:
+                if receipt['fingerprint'] != fingerprint:
+                    raise RevisionConflict('This assistant request already has a different payload')
+                return dict(state='applied', added=receipt['added'], duplicate=receipt['duplicate'], frame=copy.deepcopy(self._frame(snapshot, receipt['frame_id'])))
+            data, frame = self._writable_frame(frame_id)
+            if frame['status'] != 'pending' or frame['revision'] != revision:
+                raise RevisionConflict('This pending frame changed. Reload it before submitting boxes.')
+            merged = list(frame['boxes'])
+            added = duplicate = 0
+            for box in boxes:
+                found = False
+                for old in merged:
+                    if old['class_id'] != box['class_id']:
+                        continue
+                    width = max(0, min(old['x2'], box['x2']) - max(old['x1'], box['x1']))
+                    height = max(0, min(old['y2'], box['y2']) - max(old['y1'], box['y1']))
+                    overlap = width * height
+                    union = (old['x2'] - old['x1']) * (old['y2'] - old['y1']) + (box['x2'] - box['x1']) * (box['y2'] - box['y1']) - overlap
+                    if union > 0 and overlap / union >= .9:
+                        found = True
+                        break
+                if found:
+                    duplicate += 1
+                else:
+                    merged.append(box)
+                    added += 1
+            if len(merged) > 4096 or len(receipts) >= 4096:
+                raise ValueError('This recording has reached its annotation or assistant request limit')
+            if added:
+                frame.update(boxes=merged, empty_confirmed=False, revision=revision + 1)
+            data['assistant_receipts'] = {**receipts, request_key: dict(fingerprint=fingerprint, frame_id=frame_id, added=added, duplicate=duplicate)}
+            label = self._path(frame['label'])
+            if not label.parent.is_dir():
+                raise ValueError("The run's draft-labels directory is missing")
+            old_label = label.read_bytes() if label.exists() else None
+            if added:
+                atomic_write(label, yolo_text(merged).encode('utf-8'))
+            try:
+                signature = atomic_write(self._path('manifest.json'), (json.dumps(data, indent=2, ensure_ascii=False, allow_nan=False) + '\n').encode('utf-8'))
+                self._cache_committed_manifest(data, signature)
+            except Exception:
+                if added:
+                    if old_label is None:
+                        label.unlink(missing_ok=True)
+                    else:
+                        atomic_write(label, old_label)
+                raise
+            return dict(state='applied', frame=copy.deepcopy(frame), added=added, duplicate=duplicate)
 
     def review_frames(self, payload):
         if not isinstance(payload, dict) or set(payload) != {'frames', 'status', 'empty_confirmed'}:
@@ -391,8 +455,8 @@ class BoardProposals:
             if self._proposer is None or self._model_id != model_id:
                 factory = self._factory
                 if factory is None:
-                    from prepare_dataset import ONNXProposer
-                    factory = ONNXProposer
+                    from model_inference import create_proposer
+                    factory = create_proposer
                 new = factory(Path(model['path']), 0, confidence, tiles)
                 old = self._proposer
                 self._proposer, self._model_id = (new, model_id)
@@ -414,12 +478,20 @@ class BoardProposals:
             raise RevisionConflict('This frame changed while suggestions were running. Request them again.')
         return {'frame_id': frame_id, 'revision': revision, 'model_id': model_id, 'boxes': boxes, **assistance}
 
-def make_server(store, port=8765, token=None, *, workbench=None, proposals=None, recording_library=None, empty_scans=None):
+def make_server(store, port=8765, token=None, *, workbench=None, proposals=None, recording_library=None, empty_scans=None, assistants=None):
     token = token or secrets.token_urlsafe(32)
     workbench_lock = threading.Lock()
     recordings_lock = threading.Lock()
     stores_lock = threading.Lock()
+    assistants_lock = threading.Lock()
     recording_stores = {store.root: store}
+
+    def get_assistants():
+        nonlocal assistants
+        with assistants_lock:
+            if assistants is None:
+                assistants = AssistantHub(PROJECT, ReviewStore)
+            return assistants
 
     def get_workbench():
         nonlocal workbench
@@ -473,6 +545,8 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
             self.send_header('Content-Type', content_type)
             self.send_header('Content-Length', str(len(body)))
             self.send_header('Cache-Control', 'no-store')
+            if status == 503:
+                self.send_header('Retry-After', '1')
             self.send_header('X-Content-Type-Options', 'nosniff')
             self.send_header('Referrer-Policy', 'no-referrer')
             self.send_header('Content-Security-Policy', "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
@@ -511,6 +585,15 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
             origins = self.headers.get_all('Origin', [])
             if origins and origins != [f'http://{host}']:
                 return (None, self._error(403, 'Origin is not this local review server'))
+            machine_tokens = self.headers.get_all('X-Assistant-Token', [])
+            if parsed.path.startswith('/api/assistant/'):
+                recordings = self.headers.get_all('X-Review-Run', [])
+                if parsed.query or len(machine_tokens) != 1 or self.headers.get_all('X-Review-Token', []) or len(recordings) > 1:
+                    return (None, self._error(403, 'A separate scoped assistant token is required'))
+                self._assistant_connection = get_assistants().authenticate(machine_tokens[0], recordings[0] if recordings else None)
+                return (parsed.path, None)
+            if machine_tokens:
+                return (None, self._error(403, 'Assistant tokens cannot access browser review routes'))
             if parsed.path == '/' and self.command == 'GET':
                 query = parse_qs(parsed.query, keep_blank_values=True)
                 supplied = query.get('token', [''])
@@ -542,7 +625,16 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                 if route == '/':
                     return self._send(200, (PROJECT / 'review_dataset.html').read_bytes(), 'text/html; charset=utf-8')
                 if route == '/api/manifest':
-                    return self._send(200, self._store().manifest())
+                    selected = self._store()
+                    get_assistants().flush(selected)
+                    return self._send(200, selected.manifest())
+                if route == '/api/assistants':
+                    return self._send(200, get_assistants().snapshot(self._store()))
+                if route == '/api/assistant/status':
+                    return self._send(200, get_assistants().status(self._assistant_connection))
+                assistant_image = re.fullmatch(r'/api/assistant/image/(frame-[0-9]{6,12})', route)
+                if assistant_image:
+                    return self._send(200, get_assistants().image_path(self._assistant_connection, assistant_image[1]).read_bytes(), 'image/png')
                 if route == '/api/recordings':
                     return self._send(200, get_recordings().snapshot())
                 if route == '/api/workbench':
@@ -557,6 +649,12 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                 if route.startswith('/image/') and FRAME_ID.fullmatch(route[7:]):
                     return self._send(200, self._store().image_path(route[7:]).read_bytes(), 'image/png')
                 self._error(404, 'Unknown review route')
+            except ReviewBusy as exc:
+                self._error(503, str(exc))
+            except AssistantUnauthorized as exc:
+                self._error(403, str(exc))
+            except AssistantConflict as exc:
+                self._error(409, str(exc))
             except (ValueError, json.JSONDecodeError) as exc:
                 self._error(400, str(exc))
             except (KeyError, FileNotFoundError):
@@ -581,6 +679,18 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                 payload = json.loads(self.rfile.read(length).decode('utf-8'))
                 if not isinstance(payload, dict):
                     raise ValueError('Expected a JSON object')
+                if route == '/api/assistants/connect':
+                    result = get_assistants().connect(self._store(), payload)
+                    result['api_base'] = f'http://127.0.0.1:{self.server.server_port}/api/assistant'
+                    return self._send(200, result)
+                if route == '/api/assistants/disconnect':
+                    return self._send(200, get_assistants().disconnect(self._store(), payload))
+                if route == '/api/assistant/heartbeat':
+                    return self._send(200, get_assistants().status(self._assistant_connection, payload))
+                if route == '/api/assistant/frames':
+                    return self._send(200, get_assistants().frames(self._assistant_connection, payload))
+                if route == '/api/assistant/boxes':
+                    return self._send(200, get_assistants().submit(self._assistant_connection, payload))
                 if route == '/api/recordings/browse':
                     return self._send(200, get_recordings().browse())
                 if route == '/api/recordings/prepare':
@@ -603,6 +713,14 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                     return self._send(200, get_workbench().start_training(payload, self._store().export_reviewed))
                 if route == '/api/models/select':
                     return self._send(200, get_workbench().select_model(selected_id(payload)))
+                if route == '/api/models/browse':
+                    if payload:
+                        raise ValueError('Browse does not accept a model path')
+                    return self._send(200, get_workbench().model_imports.browse())
+                if route == '/api/models/import':
+                    return self._send(200, get_workbench().model_imports.start(payload))
+                if route == '/api/models/convert':
+                    return self._send(200, get_workbench().model_imports.convert(payload))
                 prefix = '/api/frame/'
                 if route.startswith(prefix) and route.endswith('/propose'):
                     frame_id = route[len(prefix):-len('/propose')]
@@ -611,7 +729,11 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                 if route.startswith(prefix) and FRAME_ID.fullmatch(route[len(prefix):]):
                     return self._send(200, self._store().update_frame(route[len(prefix):], payload))
                 self._error(404, 'Unknown review route')
-            except RevisionConflict as exc:
+            except ReviewBusy as exc:
+                self._error(503, str(exc))
+            except AssistantUnauthorized as exc:
+                self._error(403, str(exc))
+            except AssistantConflict as exc:
                 self._error(409, str(exc))
             except (ValueError, UnicodeError) as exc:
                 self._error(400, str(exc))

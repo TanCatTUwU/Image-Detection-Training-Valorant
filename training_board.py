@@ -37,7 +37,10 @@ def validate_options(payload, registry):
     if any(options[key] % 32 for key in ('imgsz', 'model_width', 'model_height')):
         raise ValueError('Image size, model width and model height must be multiples of 32')
     if options['device'] != 'cpu':
-        raise ValueError('This prepared runtime supports CPU training; DirectML is used for inference')
+        from model_inference import hardware
+        available = hardware().get('device')
+        if not available or not available.startswith('cuda:') or options['device'] != available:
+            raise ValueError('The selected training GPU is unavailable in this runtime')
     if not isinstance(options['auto_activate'], bool):
         raise ValueError('auto_activate must be true or false')
     _safe_name(options['name'])
@@ -79,6 +82,10 @@ class TrainingBoard:
         self.launcher = launcher or subprocess.Popen
         self.alive = alive or process_alive
         self.python = Path(runtime_python) if runtime_python else self.project / 'runtime-env/Scripts/python.exe'
+        from local_model_import import LocalModelImport
+        from model_inference import HardwareMonitor
+        self.model_imports = LocalModelImport(self.project, self.registry, self.python)
+        self.hardware = HardwareMonitor()
 
     def _prepare(self):
         if self.root.is_symlink() or self.root.resolve().parent != self.project:
@@ -110,7 +117,14 @@ class TrainingBoard:
     def snapshot(self):
         job = self._latest()
         models = self.registry.list_models()
-        return dict(options=dict(defaults=dict(DEFAULTS), devices=[{'id': 'cpu', 'label': 'CPU · local fine-tuning'}], checkpoints=self.registry.checkpoints()), models=models, active_model_id=next((entry['id'] for entry in models if entry['is_active']), None), training=_public_job(job) if job else None)
+        from model_inference import choose_inference
+        capabilities = self.hardware.snapshot()
+        devices = [{'id': 'cpu', 'label': 'CPU · local fine-tuning'}]
+        if capabilities and str(capabilities.get('device', '')).startswith('cuda:'):
+            devices.append({'id': capabilities['device'], 'label': capabilities['label']})
+        for model in models:
+            model['inference'] = choose_inference(model['path'], capabilities) if capabilities is not None else {'backend': 'checking', 'label': 'Checking hardware…', 'device': None}
+        return dict(options=dict(defaults=dict(DEFAULTS), devices=devices, checkpoints=self.registry.checkpoints()), models=models, active_model_id=next((entry['id'] for entry in models if entry['is_active']), None), training=_public_job(job) if job else None, model_import=self.model_imports.snapshot())
 
     def _console(self, script, mode, manifest, *, threads=2):
         if not self.python.is_file():

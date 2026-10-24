@@ -14,6 +14,13 @@ from pathlib import Path
 def utc_now():
     return datetime.now(timezone.utc).isoformat()
 
+def _sha256(path):
+    digest = hashlib.sha256()
+    with Path(path).open('rb') as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
+
 def atomic_json(path, value):
     path = Path(path)
     temporary = path.with_name(f'write-{secrets.token_hex(8)}.tmp')
@@ -250,11 +257,16 @@ class ModelRegistry:
         current = next((entry for entry in entries if entry['id'] == model_id), None)
         if current is None:
             raise ValueError('Unknown model ID; refresh the model library')
+        if current['view'] == view:
+            return self.resolve(current['id'])
         family = current.get('family', current['id'])
         siblings = [entry for entry in entries if entry.get('family', entry['id']) == family]
-        sibling = next((entry for entry in siblings if entry['view'] == view), None)
-        if sibling is None and view == 'full':
-            sibling = next((entry for entry in siblings if entry['view'] == 'focus'), None)
+        candidates = [entry for entry in siblings if entry['view'] == view]
+        if not candidates and view == 'full' and current['view'] == 'focus':
+            return self.resolve(current['id'])
+        if not candidates and view in ('full', 'focus'):
+            candidates = [entry for entry in siblings if entry['view'] == ('focus' if view == 'full' else 'full')]
+        sibling = max(candidates, key=lambda entry: entry['input_shape'][2] * entry['input_shape'][3], default=None)
         return self.resolve(sibling['id']) if sibling else None
 
     def register(self, path, label=None, view=None, checkpoint=None):
@@ -274,7 +286,8 @@ class ModelRegistry:
         checkpoint = Path(checkpoint).resolve() if checkpoint is not None else None
         if checkpoint is not None and (checkpoint.suffix.lower() != '.pt' or not checkpoint.is_file()):
             raise ValueError('A local checkpoint file is required')
-        digest = hashlib.sha256(source.read_bytes()).hexdigest()
+        checkpoint_digest = _sha256(checkpoint) if checkpoint is not None else None
+        digest = _sha256(source)
         model_id = f'model-{digest[:24]}'
         self._prepare()
         with file_lock(self.root / 'registry.lock'):
@@ -283,6 +296,37 @@ class ModelRegistry:
                 raise ValueError('Model library metadata is damaged; existing models were preserved')
             existing = next((entry for entry in manifest['models'] if entry.get('id') == model_id), None)
             if existing is not None:
+                current = self.validate(model_id)
+                if _sha256(current['path']) != digest:
+                    raise ValueError('The managed ONNX differs from the imported model; existing files were preserved')
+                if checkpoint is not None:
+                    destination = self.root / model_id
+                    target = destination / 'checkpoint.pt'
+                    family = 'checkpoint-' + checkpoint_digest
+                    if destination.is_symlink() or destination.resolve() != destination.absolute() or target.is_symlink() or target.resolve().parent != destination:
+                        raise ValueError('The matching checkpoint must stay inside its managed model folder')
+                    if existing.get('checkpoint') and existing.get('family') != family:
+                        raise ValueError('This ONNX already has a different matching checkpoint; existing files were preserved')
+                    created = False
+                    try:
+                        if target.exists():
+                            if not target.is_file() or _sha256(target) != checkpoint_digest:
+                                raise ValueError('The existing matching checkpoint differs; existing files were preserved')
+                        else:
+                            with target.open('xb') as outgoing, checkpoint.open('rb') as incoming:
+                                created = True
+                                shutil.copyfileobj(incoming, outgoing, length=1024 * 1024)
+                                outgoing.flush()
+                                os.fsync(outgoing.fileno())
+                            if _sha256(target) != checkpoint_digest:
+                                raise ValueError('The checkpoint changed during registration')
+                        if not existing.get('checkpoint'):
+                            existing.update(checkpoint=True, family=family)
+                            atomic_json(self.root / 'models.json', manifest)
+                    except BaseException:
+                        if created:
+                            target.unlink(missing_ok=True)
+                        raise
                 return self.resolve(model_id)
             destination = self.root / model_id
             if destination.resolve().parent != self.root:
@@ -291,14 +335,16 @@ class ModelRegistry:
             try:
                 model_path = destination / 'model.onnx'
                 shutil.copyfile(source, model_path)
-                if hashlib.sha256(model_path.read_bytes()).hexdigest() != digest:
+                if _sha256(model_path) != digest:
                     raise ValueError('Model changed during registration')
                 self.validator(model_path)
                 entry = dict(id=model_id, label=label or source.stem, view=view, input_shape=shape, created_at=utc_now(), sha256=digest)
                 if checkpoint is not None:
                     shutil.copyfile(checkpoint, destination / 'checkpoint.pt')
+                    if _sha256(destination / 'checkpoint.pt') != checkpoint_digest:
+                        raise ValueError('The checkpoint changed during registration')
                     entry['checkpoint'] = True
-                    entry['family'] = 'checkpoint-' + hashlib.sha256(checkpoint.read_bytes()).hexdigest()
+                    entry['family'] = 'checkpoint-' + checkpoint_digest
                 manifest['models'].append(entry)
                 atomic_json(self.root / 'models.json', manifest)
             except BaseException:
