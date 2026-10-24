@@ -766,6 +766,8 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                     return self._send(200, get_assistants().status(self._assistant_connection, payload))
                 if route == '/api/assistant/frames':
                     return self._send(200, get_assistants().frames(self._assistant_connection, payload))
+                if route == '/api/assistant/progress':
+                    return self._send(200, get_assistants().progress(self._assistant_connection, payload))
                 if route == '/api/assistant/boxes':
                     return self._send(200, get_assistants().submit(self._assistant_connection, payload))
                 if route == '/api/recordings/browse':

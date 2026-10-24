@@ -11,6 +11,7 @@ import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from assistant_progress import ProgressStore, validate_event
 
 PROVIDERS = ('antigravity', 'custom')
 CONNECTION_ID = re.compile(r'assistant-[a-f0-9]{24}\Z')
@@ -144,6 +145,9 @@ class AssistantHub:
         self._stores = {}
         self._monitor = None
         self._monitor_error = None
+        self._progress = ProgressStore(self.project)
+        self._state_cache = {}
+        self._migration_signatures = {}
         self._path = self.project / 'runtime-data' / 'assistant-connections.json'
         self._registry = _load(self._path, dict(schema_version=1, connections={}))
         if not isinstance(self._registry.get('connections'), dict):
@@ -179,14 +183,48 @@ class AssistantHub:
             self._stores[root] = self._store_factory(root)
         return self._stores[root]
 
-    def _state(self, store):
-        state = _load(store._path('assistant-state.json'), dict(schema_version=1, requests={}))
+    def _state(self, store, *, clone=True):
+        path = store._path('assistant-state.json')
+        signature = self._signature(path)
+        cached = self._state_cache.get(store.root)
+        if cached is not None and cached[0] == signature:
+            return copy.deepcopy(cached[1]) if clone else cached[1]
+        state = _load(path, dict(schema_version=1, requests={}))
         if not isinstance(state.get('requests'), dict):
             raise ValueError('Invalid assistant request state')
-        return state
+        self._state_cache[store.root] = (signature, state)
+        return copy.deepcopy(state) if clone else state
 
     def _save_state(self, store, state):
         _atomic_json(store._path('assistant-state.json'), state)
+        self._state_cache[store.root] = (self._signature(store._path('assistant-state.json')), copy.deepcopy(state))
+
+    @staticmethod
+    def _signature(path):
+        try:
+            stat = path.stat()
+        except FileNotFoundError:
+            return None
+        return stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns
+
+    @staticmethod
+    def _manifest(store):
+        return store._manifest_snapshot(clone=False) if hasattr(store, '_manifest_snapshot') else store.manifest()
+
+    def _migrate_progress(self, store, state):
+        signature = self._signature(store._path('assistant-state.json'))
+        if self._migration_signatures.get(store.root, object()) == signature:
+            return
+        completed = {}
+        for entry in state['requests'].values():
+            if entry['state'] == 'applied':
+                key = entry['connection_id'], entry['frame_id']
+                completed[key] = max(completed.get(key, -1), entry['revision'] + int(entry.get('added', 0) > 0))
+        if completed:
+            with self._progress.transaction() as database:
+                for (connection_id, fid), revision in completed.items():
+                    self._progress.success(database, connection_id, fid, revision, _utc())
+        self._migration_signatures[store.root] = signature
 
     def _usage(self, connection):
         if self._monitor is None and self._monitor_error is None:
@@ -208,10 +246,15 @@ class AssistantHub:
             result['error'] = 'Provider usage is unavailable'
         return result
 
-    def _public(self, connection, state=None):
-        requests = (state or self._state(self._store(connection)))['requests'].values()
+    def _public(self, connection, state=None, manifest=None):
+        store = self._store(connection)
+        state = state if state is not None else self._state(store, clone=False)
+        self._migrate_progress(store, state)
+        requests = state['requests'].values()
         owned = [entry for entry in requests if entry['connection_id'] == connection['id']]
-        return dict(id=connection['id'], name=connection['name'], provider=connection['provider'], recording_id=connection['recording_id'], status=self._status(connection), last_seen=connection.get('last_seen'), processed=sum(entry['state'] == 'applied' for entry in owned), queued=sum(entry['state'] == 'queued' for entry in owned), last_error=connection.get('last_error'), usage=self._usage(connection))
+        manifest = manifest if manifest is not None else self._manifest(store)
+        progress = self._progress.snapshot(connection['id'], {frame['id']: frame for frame in manifest['frames']})
+        return dict(id=connection['id'], name=connection['name'], provider=connection['provider'], recording_id=connection['recording_id'], status=self._status(connection), last_seen=connection.get('last_seen'), processed=progress['processed'], queued=sum(entry['state'] == 'queued' for entry in owned), last_error=connection.get('last_error'), usage=self._usage(connection), progress=progress)
 
     def connect(self, store, payload):
         if not isinstance(payload, dict) or set(payload) != {'provider', 'name'} or payload.get('provider') not in PROVIDERS:
@@ -261,8 +304,11 @@ class AssistantHub:
         with self._lock:
             self.flush(store)
             recording_id = _recording_id(store.root)
-            state = self._state(store) if hasattr(store, '_path') else dict(requests={})
-            return dict(connections=[self._public(entry, state) for entry in self._registry['connections'].values() if entry['recording_id'] == recording_id], providers=list(PROVIDERS))
+            state = self._state(store, clone=False) if hasattr(store, '_path') else dict(requests={})
+            manifest = self._manifest(store)
+            signature = self._signature(store._path('manifest.json')) if hasattr(store, '_path') else None
+            version = hashlib.sha256(repr(signature).encode('ascii')).hexdigest()[:24] if signature else None
+            return dict(connections=[self._public(entry, state, manifest) for entry in self._registry['connections'].values() if entry['recording_id'] == recording_id], providers=list(PROVIDERS), annotation_version=version)
 
     def disconnect(self, store, payload):
         if not isinstance(payload, dict) or set(payload) != {'connection_id'} or not isinstance(payload['connection_id'], str):
@@ -311,7 +357,7 @@ class AssistantHub:
                 self._save()
             store = self._store(connection)
             self.flush(store)
-            return dict(connection=self._public(connection), recording_status=store.manifest()['status'])
+            return dict(connection=self._public(connection), recording_status=self._manifest(store)['status'])
 
     def frames(self, connection_id, payload):
         if not isinstance(payload, dict) or set(payload) != {'limit', 'cursor'} or type(payload['limit']) is not int or not 1 <= payload['limit'] <= 16 or type(payload['cursor']) is not int or payload['cursor'] < 0:
@@ -320,12 +366,14 @@ class AssistantHub:
             connection = self._connection(connection_id)
             store = self._store(connection)
             self.flush(store)
-            manifest = store.manifest()
+            manifest = self._manifest(store)
+            self._migrate_progress(store, self._state(store, clone=False))
+            completed = self._progress.completed(connection_id)
             frames, cursor = [], min(payload['cursor'], len(manifest['frames']))
             while cursor < len(manifest['frames']) and len(frames) < payload['limit']:
                 frame = manifest['frames'][cursor]
                 cursor += 1
-                if frame['status'] == 'pending' and store._path(frame['image']).is_file():
+                if frame['status'] == 'pending' and completed.get(frame['id']) != frame['revision'] and store._path(frame['image']).is_file():
                     frames.append({key: copy.deepcopy(frame.get(key)) for key in ('id', 'revision', 'width', 'height', 'status', 'boxes', 'time_seconds')})
                     frames[-1]['image_url'] = '/api/assistant/image/' + frame['id']
             self._seen(connection)
@@ -335,18 +383,126 @@ class AssistantHub:
     def image_path(self, connection_id, frame_id):
         with self._lock:
             connection = self._connection(connection_id)
-            return self._store(connection).image_path(frame_id)
+            store = self._store(connection)
+            with store._thread_lock:
+                frame = store._frame(self._manifest(store), frame_id)
+                if frame['status'] != 'pending':
+                    raise AssistantConflict('This frame is no longer pending')
+                return store._path(frame['image'])
+
+    def _completion_revision(self, connection_id, frame, revision, manifest, state):
+        if frame['status'] != 'pending':
+            raise AssistantConflict('This frame is no longer pending')
+        if frame['revision'] == revision:
+            return revision
+        receipts = manifest.get('assistant_receipts', {})
+        for key, entry in state['requests'].items():
+            if entry['connection_id'] != connection_id or entry['frame_id'] != frame['id'] or entry['revision'] != revision:
+                continue
+            receipt = receipts.get(key)
+            if receipt and receipt.get('fingerprint') == entry['fingerprint'] and frame['revision'] == revision + int(receipt.get('added', 0) > 0):
+                return frame['revision']
+        raise AssistantConflict('This pending frame changed. Reload it before reporting completion.')
+
+    def progress(self, connection_id, payload):
+        event, batch_id, entries, total, error = validate_event(payload, FRAME_ID)
+        with self._lock:
+            connection = self._connection(connection_id)
+            store = self._store(connection)
+            with store._locked():
+                manifest = self._manifest(store)
+                frames = {frame['id']: frame for frame in manifest['frames']}
+                state = self._state(store, clone=False)
+                with self._progress.transaction() as database:
+                    batch = self._progress.batch(database, connection_id, batch_id)
+                    is_new = batch is None
+                    if batch is None:
+                        if event != 'start':
+                            raise AssistantConflict('Start this assistant batch before reporting progress')
+                        batch = dict(batch_id=batch_id, items={}, total=total or len(entries), finished=False)
+                    items = batch['items']
+                    now = _utc()
+                    revisions = {}
+                    for fid, revision in entries:
+                        frame = frames.get(fid)
+                        if frame is None:
+                            raise KeyError('Unknown frame ID')
+                        item = items.get(fid)
+                        if item is not None and item['revision'] != revision:
+                            raise AssistantConflict('This batch already started a different frame revision')
+                        if event == 'start':
+                            if frame['status'] != 'pending' or frame['revision'] != revision:
+                                raise AssistantConflict('This pending frame changed. Reload it before starting work.')
+                            if not store._path(frame['image']).is_file():
+                                raise ValueError('The requested frame image has not been extracted')
+                            if batch['finished'] and item is None:
+                                raise AssistantConflict('This assistant batch already finished')
+                        else:
+                            if item is None:
+                                raise AssistantConflict('Start this frame before reporting completion or failure')
+                            if event == 'complete':
+                                revisions[fid] = self._completion_revision(connection_id, frame, revision, manifest, state)
+                                if item['state'] == 'failed':
+                                    raise AssistantConflict('Start a new batch to retry a failed frame')
+                    if event == 'start':
+                        if len(set(items) | {fid for fid, _ in entries}) > 32:
+                            raise ValueError('Assistant batches accept at most 32 unique frames')
+                        if total is not None and total < len(set(items) | {fid for fid, _ in entries}):
+                            raise ValueError('Batch total cannot be smaller than started frames')
+                        if not batch['finished']:
+                            batch['total'] = max(batch['total'], total or 0, len(set(items) | {fid for fid, _ in entries}))
+                        for fid, revision in entries:
+                            if fid not in items:
+                                items[fid] = dict(revision=revision, started_at=now, state='processing')
+                    elif event == 'complete':
+                        for fid, _ in entries:
+                            items[fid].update(state='completed', completed_revision=revisions[fid])
+                            self._progress.success(database, connection_id, fid, revisions[fid], now)
+                    elif event == 'fail':
+                        for fid, _ in entries:
+                            if items[fid]['state'] != 'completed':
+                                items[fid]['state'] = 'failed'
+                                self._progress.failure(database, connection_id, fid)
+                        if error and any(items[fid]['state'] == 'failed' for fid, _ in entries):
+                            connection['last_error'] = error
+                    else:
+                        batch.update(finished=True, total=len(items))
+                        for fid, item in items.items():
+                            if item['state'] == 'processing':
+                                item['state'] = 'failed'
+                                self._progress.failure(database, connection_id, fid)
+                    active = self._progress.active_batch(database, connection_id)
+                    activate = active is None or (event == 'start' and is_new)
+                    self._progress.save_batch(database, connection_id, batch, now, activate=activate)
+                self._seen(connection)
+                if event == 'complete':
+                    connection['last_error'] = None
+                return dict(connection=self._public(connection, state, manifest))
 
     def _result(self, store, entry):
         result = dict(state=entry['state'], added=entry.get('added', 0), duplicate=entry.get('duplicate', 0))
         if entry['state'] == 'applied':
-            result['frame'] = copy.deepcopy(store._frame(store.manifest(), entry['frame_id']))
+            frame = store._frame(self._manifest(store), entry['frame_id'])
+            if frame['status'] == 'pending':
+                result['frame'] = copy.deepcopy(frame)
         return result
 
     def _apply(self, store, key, entry):
-        result = store.merge_assistant(entry['frame_id'], entry['revision'], entry['boxes'], key, entry['fingerprint'])
+        snapshot = self._manifest(store)
+        receipt = snapshot.get('assistant_receipts', {}).get(key)
+        if receipt is not None:
+            if receipt['fingerprint'] != entry['fingerprint']:
+                raise AssistantConflict('This assistant request already has a different payload')
+            result = dict(state='applied', added=receipt['added'], duplicate=receipt['duplicate'])
+            frame = store._frame(snapshot, entry['frame_id'])
+            if frame['status'] == 'pending':
+                result['frame'] = copy.deepcopy(frame)
+        else:
+            result = store.merge_assistant(entry['frame_id'], entry['revision'], entry['boxes'], key, entry['fingerprint'])
         entry.update(state='applied', added=result['added'], duplicate=result['duplicate'])
         entry.pop('boxes', None)
+        with self._progress.transaction() as database:
+            self._progress.success(database, entry['connection_id'], entry['frame_id'], entry['revision'] + int(result['added'] > 0), _utc())
         return result
 
     def submit(self, connection_id, payload):
@@ -364,7 +520,7 @@ class AssistantHub:
                 if entry['state'] == 'failed':
                     raise AssistantConflict(entry['error'])
                 return self._result(store, entry)
-            manifest = store.manifest()
+            manifest = self._manifest(store)
             frame = store._frame(manifest, normalized['frame_id'])
             if frame['status'] != 'pending' or frame['revision'] != normalized['revision']:
                 raise AssistantConflict('This pending frame changed. Reload it before submitting boxes.')
@@ -399,9 +555,10 @@ class AssistantHub:
         if not hasattr(store, '_thread_lock'):
             return
         with self._lock:
-            state = self._state(store)
-            if not any(entry['state'] == 'queued' for entry in state['requests'].values()) or store.manifest()['status'] != 'complete':
+            snapshot = self._state(store, clone=False)
+            if not any(entry['state'] == 'queued' for entry in snapshot['requests'].values()) or self._manifest(store)['status'] != 'complete':
                 return
+            state = copy.deepcopy(snapshot)
             changed = False
             for key, entry in state['requests'].items():
                 if entry['state'] != 'queued':

@@ -6,6 +6,7 @@ import math
 import os
 from pathlib import Path
 import re
+import secrets
 import shutil
 import subprocess
 import sys
@@ -49,7 +50,7 @@ class AssistantClient:
         return body if image else json.loads(body)
 
     def request(self,route,payload=None):
-        if route not in ('/status','/heartbeat','/frames','/boxes'):
+        if route not in ('/status','/heartbeat','/frames','/boxes','/progress'):
             raise ValueError('Unsupported scoped assistant operation')
         return self._send(self.api_base+route,payload)
 
@@ -136,7 +137,9 @@ def process_frames(client,runner,cache_root,*,frame_limit=4,cursor=0):
     if cache.resolve().parent!=root or cache.is_symlink():
         raise ValueError('Assistant cache must stay in its connection folder')
     cache.mkdir(parents=True,exist_ok=True)
-    summary={'processed':0,'added':0,'queued':0,'errors':[],'next_cursor':cursor}
+    batch_id='batch-'+secrets.token_hex(12)
+    summary={'processed':0,'completed':0,'failed':0,'added':0,'queued':0,'errors':[],'next_cursor':cursor,'batch_id':batch_id}
+    batch_started=False
     stopped=threading.Event()
     def heartbeat():
         while not stopped.wait(20):
@@ -155,6 +158,9 @@ def process_frames(client,runner,cache_root,*,frame_limit=4,cursor=0):
             if not isinstance(frames,list):
                 raise ValueError('Invalid frame queue')
             for frame in frames:
+                if not isinstance(frame,dict) or frame.get('status')!='pending':
+                    raise ValueError('The assistant queue must contain only pending frames')
+            for frame in frames:
                 if summary['processed']>=frame_limit:
                     break
                 frame_id=frame.get('id')
@@ -162,22 +168,35 @@ def process_frames(client,runner,cache_root,*,frame_limit=4,cursor=0):
                 if not isinstance(frame_id,str) or not FRAME_ID.fullmatch(frame_id) or type(revision) is not int or revision<0 or frame_id in seen:
                     raise ValueError('Invalid or repeated queue frame')
                 seen.add(frame_id)
+                reference={'frame_id':frame_id,'revision':revision}
+                started=False
                 try:
+                    client.request('/progress',{'event':'start','batch_id':batch_id,'total':frame_limit,'frames':[reference]})
+                    started=batch_started=True
                     image=cache/f'{frame_id}-r{revision}.png'
                     if image.is_symlink() or image.resolve().parent!=cache.resolve():
                         raise ValueError('Unsafe cached image path')
                     image.write_bytes(client.image(frame['image_url']))
+                    client.request('/progress',{'event':'start','batch_id':batch_id,'total':frame_limit,'frames':[reference]})
                     reply=runner(image,frame)
                     boxes=agent_boxes(reply)
+                    if not reply['image_viewed']:
+                        raise ValueError('Antigravity could not view this image')
                     if boxes:
                         request_id=hashlib.sha256(f'{connection}:{frame_id}:{revision}'.encode()).hexdigest()
                         result=client.request('/boxes',{'frame_id':frame_id,'revision':revision,'boxes':boxes,'request_id':request_id})
                         summary['added']+=result.get('added',0)
                         summary['queued']+=int(result.get('state')=='queued')
-                    if not reply['image_viewed']:
-                        summary['errors'].append({'frame_id':frame_id,'error':'Antigravity could not view this image'})
+                    client.request('/progress',{'event':'complete','batch_id':batch_id,'frames':[reference]})
+                    summary['completed']+=1
                 except (ValueError,OSError,subprocess.SubprocessError) as error:
                     summary['errors'].append({'frame_id':frame_id,'error':str(error)[:300]})
+                    summary['failed']+=1
+                    if started:
+                        try:
+                            client.request('/progress',{'event':'fail','batch_id':batch_id,'frames':[reference],'error':'Frame review failed; retry from the pending queue'})
+                        except (ValueError,OSError):
+                            pass
                 summary['processed']+=1
                 client.request('/heartbeat',{})
             next_cursor=page.get('next_cursor')
@@ -190,6 +209,11 @@ def process_frames(client,runner,cache_root,*,frame_limit=4,cursor=0):
     finally:
         stopped.set()
         thread.join(timeout=1)
+        if batch_started:
+            try:
+                client.request('/progress',{'event':'finish','batch_id':batch_id})
+            except (ValueError,OSError) as error:
+                summary['errors'].append({'frame_id':None,'error':f'Could not finish progress report: {str(error)[:200]}'})
     return summary
 
 

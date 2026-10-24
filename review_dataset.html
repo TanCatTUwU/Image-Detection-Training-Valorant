@@ -102,6 +102,7 @@ let gridSelection=new Set(), gridSelectionContext="", pendingGridReview=null, pe
 let emptyScan=null, emptyScanLoading=false, emptyScanAction=false, emptyScanSequence=0, emptyScanAvailable=true;
 let scanManifestPending=false, scanManifestLoading=false, scanMessage="";
 let assistantConnections=[], assistantProviders=["antigravity"], assistantLoaded=false, assistantLoading=false, assistantAction=false, assistantSequence=0, assistantManifestLoading=false, assistantsAvailable=true;
+let assistantManifestVersion=null, assistantLastManifestRefresh=0;
 let frameRowFilter="", frameRowScrollRequest=null;
 let frameRowGeneration=-1, frameRowCache=new Map(), frameRowsBusy=null, boxRows=[];
 let frameIndexCache=null, frameImageCache=new Map(), frameImageCacheBytes=0;
@@ -662,13 +663,34 @@ function renderAssistants() {
   const container=$("assistantConnections"), scroll=container.scrollTop; container.replaceChildren();
   if(!assistantConnections.length) { const text=document.createElement("p"); text.className="help"; text.textContent=assistantsAvailable?"No assistant connected.":"Assistant connections unavailable."; container.append(text); return; }
   for(const connection of assistantConnections) {
-    const card=document.createElement("section"); card.className="assistant-connection";
+    const card=document.createElement("section"); card.className="assistant-connection"; card.dataset.assistantConnection=connection.id;
     const heading=document.createElement("div"); heading.className="assistant-connection-title";
     const name=document.createElement("strong"); name.textContent=String(connection.name || "Antigravity");
     const disconnect=document.createElement("button"); disconnect.type="button"; disconnect.className="small"; disconnect.textContent="Disconnect"; disconnect.dataset.assistantDisconnect=connection.id; disconnect.disabled=assistantAction || connection.status==="expired"; disconnect.onclick=()=>disconnectAssistant(connection.id);
     heading.append(name,disconnect); card.append(heading);
     const status=document.createElement("p"), processed=Number.isFinite(connection.processed)?connection.processed:null, queued=Number.isFinite(connection.queued)?connection.queued:null;
     status.textContent=[assistantStatus(connection.status),processed!==null?`${processed} processed`:null,queued?`${queued} queued`:null].filter(Boolean).join(" · "); card.append(status);
+    const progress=connection.progress;
+    if(progress && typeof progress==="object") {
+      const details=document.createElement("div"); details.className="assistant-progress"; details.setAttribute("aria-live","polite");
+      const current=Array.isArray(progress.current_frames)?progress.current_frames.filter(item=>typeof item?.frame_id==="string"):[];
+      const active=document.createElement("p"); active.className="assistant-current";
+      if(current.length) {
+        const names=current.map(item=>item.frame_id), label=["connected","online","active"].includes(connection.status)?"Processing":"Last reported";
+        active.textContent=`${label} ${names.slice(0,3).join(", ")}${names.length>3?` (+${names.length-3})`:""}`; active.title=names.join(", ");
+      } else active.textContent=progress.state==="completed"?"Batch complete":progress.state==="failed"?"Batch finished with errors":"Waiting for pending frames";
+      details.append(active);
+      const total=Number.isInteger(progress.batch_total)&&progress.batch_total>0?progress.batch_total:0;
+      const completed=Number.isInteger(progress.batch_completed)&&progress.batch_completed>=0?progress.batch_completed:0;
+      const failed=Number.isInteger(progress.batch_failed)&&progress.batch_failed>=0?progress.batch_failed:0;
+      if(progress.batch_id && total) {
+        const count=document.createElement("p"); count.className="assistant-batch-count"; count.textContent=`Batch: ${completed} / ${total} completed${failed?` · ${failed} failed`:""}`;
+        const track=document.createElement("div"),fill=document.createElement("span"); track.className="assistant-usage-track"; track.setAttribute("role","progressbar"); track.setAttribute("aria-label","Assistant batch progress"); track.setAttribute("aria-valuemin","0"); track.setAttribute("aria-valuemax",String(total)); track.setAttribute("aria-valuenow",String(Math.min(total,completed+failed))); fill.style.width=`${Math.min(100,(completed+failed)/total*100)}%`; track.append(fill); details.append(count,track);
+      }
+      if(typeof progress.last_completed_frame==="string") { const last=document.createElement("p"); last.className="assistant-last-frame"; last.textContent=`Last completed: ${progress.last_completed_frame}`; details.append(last); }
+      if(Number.isInteger(progress.failed) && progress.failed>0) { const errors=document.createElement("p"); errors.textContent=`${progress.failed} ${progress.failed===1?"frame":"frames"} failed`; details.append(errors); }
+      card.append(details);
+    }
     const seen=document.createElement("p"); seen.textContent=connection.last_seen?`Last seen ${assistantDate(connection.last_seen)}`:"Bridge has not checked in."; card.append(seen);
     if(connection.last_error) { const error=document.createElement("p"); error.textContent="Assistant reported an issue. Check the bridge."; card.append(error); }
     const usage=connection.usage, windows=Array.isArray(usage?.windows)?usage.windows:[];
@@ -694,16 +716,16 @@ function closeAssistantDialog() {
   if($("assistantDialog").open) $("assistantDialog").close();
 }
 function resetAssistants() {
-  assistantSequence++; assistantConnections=[]; assistantLoaded=false; assistantLoading=false; assistantAction=false; assistantManifestLoading=false; assistantsAvailable=true; closeAssistantDialog(); assistantMessage(); renderAssistants();
+  assistantSequence++; assistantConnections=[]; assistantLoaded=false; assistantLoading=false; assistantAction=false; assistantManifestLoading=false; assistantManifestVersion=null; assistantLastManifestRefresh=0; assistantsAvailable=true; closeAssistantDialog(); assistantMessage(); renderAssistants();
 }
-async function refreshAssistantManifest() {
+async function refreshAssistantManifest(annotationVersion=null) {
   if(assistantManifestLoading || scanManifestLoading || busy || dirty || drag || proposing || proposal || $("emptyDialog").open || !manifest || (gridSize===1 && frame && !image)) return;
   const generation=recordingSequence, recordingId=selectedRecordingId, version=editVersion, loading=loadSequence, request=++manifestSequence;
   assistantManifestLoading=true;
   try {
     const loaded=await api("/api/manifest",undefined,recordingId);
     if(generation!==recordingSequence || request!==manifestSequence || busy || dirty || drag || proposing || proposal || $("emptyDialog").open || version!==editVersion || loading!==loadSequence) return;
-    if(JSON.stringify(loaded)===JSON.stringify(manifest)) return;
+    if(JSON.stringify(loaded)===JSON.stringify(manifest)) { assistantManifestVersion=annotationVersion; assistantLastManifestRefresh=Date.now(); return; }
     const previous=frame; manifest=loaded;
     const list=visibleFrames(), next=list.find(item=>item.id===currentId) || list[0];
     if(gridSize===1 && next && previous?.id===next.id && previous.status===next.status && JSON.stringify(previous.flags)===JSON.stringify(next.flags) && image) {
@@ -711,10 +733,11 @@ async function refreshAssistantManifest() {
       const revision=[...$("meta").children].find(node=>node.textContent.startsWith("revision ")); if(revision) revision.textContent=`revision ${next.revision}`;
     } else if(gridSize!==1 && previous?.id===next?.id) { frame=next || null; boxes=next?clone(next.boxes):[]; refreshProgress(); }
     else await showFrame(next?.id);
+    if(generation===recordingSequence && request===manifestSequence) { assistantManifestVersion=annotationVersion; assistantLastManifestRefresh=Date.now(); }
   } catch(error) { if(generation===recordingSequence) assistantMessage("Annotations could not refresh. Will retry.",true); }
   finally { if(generation===recordingSequence) assistantManifestLoading=false; }
 }
-async function refreshAssistants() {
+async function refreshAssistants(fromTimer=false) {
   if(assistantLoading || assistantAction || manifest?.status!=="complete") return;
   const generation=recordingSequence, recordingId=selectedRecordingId, request=++assistantSequence; assistantLoading=true;
   try {
@@ -724,7 +747,10 @@ async function refreshAssistants() {
     const providers=Array.isArray(result.providers)?result.providers:["antigravity"];
     const changed=!assistantLoaded || JSON.stringify(connections)!==JSON.stringify(assistantConnections) || JSON.stringify(providers)!==JSON.stringify(assistantProviders) || !assistantsAvailable;
     assistantConnections=connections; assistantProviders=providers; assistantLoaded=true; assistantsAvailable=true; assistantMessage(); if(changed || connections.some(connection=>connection.usage?.windows?.some(window=>window.reset_at && new Date(typeof window.reset_at==="number" && window.reset_at<1e12?window.reset_at*1000:window.reset_at).getTime()<Date.now()))) renderAssistants();
-    if(connections.some(connection=>!["revoked","disconnected","expired"].includes(connection.status))) await refreshAssistantManifest();
+    if(connections.some(connection=>!["revoked","disconnected","expired"].includes(connection.status))) {
+      const annotationVersion=typeof result.annotation_version==="string"?result.annotation_version:null;
+      if(annotationVersion!==null?annotationVersion!==assistantManifestVersion:!fromTimer || Date.now()-assistantLastManifestRefresh>=3000) await refreshAssistantManifest(annotationVersion);
+    }
   } catch(error) { if(generation===recordingSequence && request===assistantSequence) { if(error.status===404) assistantsAvailable=false; assistantMessage(error.status===404?"Connections unavailable on this server.":"Connections could not refresh. Will retry.",error.status!==404); renderAssistants(); } }
   finally { if(generation===recordingSequence && request===assistantSequence) { assistantLoading=false; $("connectAssistant").disabled=assistantAction || !assistantsAvailable || manifest?.status!=="complete"; } }
 }
@@ -750,9 +776,12 @@ python assistant_bridge.py --connection-file assistant-connection.json --frames 
 Head = class 0; Body = class 1. Boxes remain pending for review. Protect the configuration secret. Disconnect here to revoke API access.`:`Use api_base and the X-Assistant-Token header from the copied configuration. Never put the secret in a URL.
 
 GET /status to inspect the recording.
-POST /frames with {"limit":4,"cursor":0} to request pending frames.
-Download each returned image_url with the same header.
+POST /frames with {"limit":4,"cursor":0} to request pending frames only. Never process approved, rejected, or auto-removed frames.
+POST /progress with {"event":"start","batch_id":"batch-1","total":4,"frames":[{"frame_id":"frame-000001","revision":0}]} before processing a frame.
+Download its returned image_url with the same header. If its status or revision changed, skip it and refresh the queue.
 POST /boxes with {"frame_id":"frame-000001","revision":0,"boxes":[{"class_id":0,"x1":0.1,"y1":0.1,"x2":0.2,"y2":0.3}]} using that frame's current revision.
+
+POST /progress with {"event":"complete","batch_id":"batch-1","frames":[{"frame_id":"frame-000001","revision":0}]} after each viewed frame, including frames with no additions. Use the original queue revision. For a batch, list up to 32 completed frames. Report event="fail" with an error for a failed frame, then event="finish" with batch_id when the batch ends. Use a new batch_id for each batch.
 
 Coordinates are normalized from 0 to 1. Head = class 0; Body = class 1. Review conflicts before retrying. Boxes remain pending for human review. POST /heartbeat can report actual usage windows. Disconnect here to revoke API access.`;
       $("assistantForm").hidden=true; $("assistantSetup").hidden=false; $("assistantConfig").hidden=false; $("assistantDialogTitle").textContent="Assistant connected";
@@ -1590,7 +1619,7 @@ refreshRecordings().finally(async()=>{ await loadManifest(); refreshEmptyScan();
 setInterval(refreshWorkbench,3000);
 setInterval(refreshRecordings,3000);
 setInterval(refreshEmptyScan,3000);
-setInterval(refreshAssistants,3000);
+setInterval(()=>refreshAssistants(true),1000);
 </script>
 </body>
 </html>
