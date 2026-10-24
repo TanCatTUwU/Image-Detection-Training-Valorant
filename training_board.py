@@ -224,7 +224,7 @@ class _Tee:
 
 def _train(job, update):
     from train_model import main
-    options = job['options']
+    options = {**DEFAULTS, **job['options']}
     arguments = ['--data', job['data'], '--weights', job['checkpoint'], '--device', options['device'], '--name', job['id']]
     for key in ('epochs', 'batch', 'imgsz', 'workers', 'threads', 'mosaic', 'mixup', 'degrees', 'fliplr', 'patience'):
         value = max(options[key], options.get('model_width', 320), options.get('model_height', 320)) if key == 'imgsz' else options[key]

@@ -37,6 +37,7 @@ training-jobs/
 training-exports/
 video-jobs/
 empty-scan-jobs/
+deleted-items/
 tests/
 test/
 __tests__/

@@ -45,6 +45,7 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid #4b5564;border-
 .sidebar-panel{overflow:auto;overscroll-behavior:contain;gap:10px}.sidebar-group{flex-shrink:0;min-width:0;border-bottom:1px solid var(--line);padding-bottom:8px}.sidebar-group>summary{font-size:12px;font-weight:600;list-style-position:inside;padding:4px 0;user-select:none}.sidebar-group>summary:focus-visible{outline:2px solid #a9bbd4;outline-offset:2px}.sidebar-group-content{padding-top:9px}.sidebar-group .frame-list{max-height:35dvh;min-height:72px;flex:none}.sidebar-group .empty-scan-controls,.sidebar-group .assistant-panel{margin:0;border:0;padding:0;background:transparent}.sidebar-group .assistant-heading{justify-content:flex-start}.sidebar-group .assistant-connections{max-height:220px}.sidebar-group .recordings-scroll{overflow:visible;max-height:none;flex:none}.sidebar-group .recording-footer{margin-top:8px;padding-top:10px}.sidebar-group .counts{margin-bottom:4px}
 .training-recordings{padding:12px;margin:16px 0;border:1px solid var(--line);border-radius:5px;min-width:0}.training-recordings legend{font-size:12px;font-weight:600;padding:0 5px}.training-recordings-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}.training-recordings-head p{margin:0;font-size:11px}.training-recording-list{max-height:190px;overflow:auto;overscroll-behavior:contain}.training-recording-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}.training-recording-row label{display:flex;gap:8px;align-items:flex-start;font-size:12px;min-width:0}.training-recording-row input{margin-top:3px;flex-shrink:0}.training-recording-row strong{display:block;font-size:12px;font-weight:500;overflow-wrap:anywhere}.training-recording-row small{display:block;font-size:10px;color:var(--muted);margin-top:2px}.training-recording-row .validation-choice{font-size:11px;white-space:nowrap;color:var(--muted)}.training-recording-row.unavailable strong{color:var(--muted)}.training-recordings .training-options-note{margin:8px 0 0}.training-selection-status{margin:8px 0 0!important;font-size:11px!important}.training-selection-status.error{color:#f0aaa2}.training-grid label small{font-size:10px;font-weight:400;line-height:1.4}.training-augmentation{border:0;border-top:1px solid var(--line);padding:12px 0 0;margin:0;min-width:0}.training-augmentation legend{font-size:12px;font-weight:600;padding:0 8px 0 0}.training-augmentation .training-grid{margin:0 0 10px}.training-guidance{padding:10px 12px;border-left:2px solid #74849a;background:#20252d;font-size:11px!important}.training-metrics{margin:12px 0}.metric-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.metric-value{padding:8px 10px;background:#14181e;border:1px solid var(--line);border-radius:4px;min-width:0}.metric-value span{display:block;font-size:10px;color:var(--muted)}.metric-value strong{display:block;font-size:17px;font-weight:500;font-variant-numeric:tabular-nums;margin-top:2px}.training-plots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:10px}.training-plot{background:#14181e;border:1px solid var(--line);border-radius:4px;padding:9px;min-width:0}.training-plot h3{font-size:12px;font-weight:500;margin:0 0 5px}.training-plot svg{display:block;width:100%;height:auto}.plot-legend{display:flex;flex-wrap:wrap;gap:5px 12px;font-size:10px;color:var(--muted);margin-top:4px}.plot-legend span{display:flex;align-items:center;gap:5px}.plot-legend i{width:12px;height:2px;display:inline-block;background:var(--series-color)}.plot-empty{min-height:110px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;text-align:center}.training-metrics .metric-epoch{font-size:11px;margin:0 0 8px}.training-log-details{margin:10px 0}.training-log-details>summary{font-size:11px;color:var(--muted)}
 @media(max-width:760px){.sidebar-group .frame-list{display:flex;max-height:180px}.sidebar-group .counts{grid-template-columns:repeat(4,1fr)}.sidebar-group .assistant-connections{display:block;max-height:180px}.training-recordings{padding:10px}.training-recording-row{gap:8px}.training-recording-row .validation-choice{font-size:10px}.training-recording-list{max-height:180px}.metric-summary{grid-template-columns:repeat(3,minmax(0,1fr))}.metric-value{padding:7px}.metric-value strong{font-size:15px}.training-plots{grid-template-columns:1fr}.training-guidance{padding:8px 10px}.training-recordings-head{align-items:flex-start}.training-plot{padding:7px}}
+.lifecycle-buttons{display:flex;flex-wrap:wrap;gap:6px}.delete-reason{font-size:11px;color:var(--muted);margin:0;overflow-wrap:anywhere}.deleted-items-dialog{width:580px}.deleted-list{display:grid;gap:9px;margin-top:14px}.deleted-item{border:1px solid var(--line);border-radius:5px;padding:11px;display:flex;align-items:flex-start;gap:12px}.deleted-item-copy{flex:1;min-width:0;overflow-wrap:anywhere}.deleted-item strong{display:block;font-size:12px}.deleted-item p{margin:3px 0 0;font-size:11px}.deleted-item button{flex-shrink:0}.delete-guard{color:var(--amber)}#deleteTarget{overflow-wrap:anywhere}#deletedItemsMessage{margin-bottom:0}@media(max-width:760px){.recording-footer{flex-wrap:wrap}.recording-footer button{flex:1 1 calc(50% - 7px);width:auto}.recording-footer .delete-reason{flex-basis:100%}.deleted-item{flex-wrap:wrap}.model-bar .delete-reason{width:100%}}
 </style>
 </head>
 <body>
@@ -58,15 +59,17 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid #4b5564;border-
 <details class="sidebar-group" data-sidebar-group="empty-scan" open><summary>Empty scan</summary><div class="sidebar-group-content"><section class="empty-scan-controls" aria-label="Empty frame scan"><button id="startEmptyScan" class="small" disabled title="Checks untouched, unboxed pending frames with the selected model family. Removed frames remain recoverable.">Scan empty frames</button><div id="emptyScanStatus" hidden><div class="scan-heading"><strong id="emptyScanTitle">Empty scan</strong><button id="cancelEmptyScan" class="small" hidden>Cancel</button></div><p id="emptyScanMessage"></p><div class="progress"><div id="emptyScanProgress"></div></div><div id="emptyScanCounts"></div><div id="emptyScanModel"></div></div><p id="emptyScanError" class="workbench-error" role="status" hidden></p></section></div></details>
 <details class="sidebar-group" data-sidebar-group="assistant" open><summary>Assistant</summary><div class="sidebar-group-content"><section id="assistantPanel" class="assistant-panel" aria-label="Connected assistants"><div class="assistant-heading"><button id="connectAssistant" class="small" type="button">Connect assistant</button></div><p class="help">Pending frames only · Dashed AI boxes</p><div id="assistantConnections" class="assistant-connections"><p class="help">Loading connections…</p></div><p id="assistantMessage" class="assistant-message" role="status" aria-live="polite" hidden></p></section></div></details>
 </section>
-<section id="recordingsPanel" class="sidebar-panel" role="tabpanel" aria-labelledby="recordingsTab" hidden><details class="sidebar-group" data-sidebar-group="recordings" open><summary>Recordings</summary><div class="sidebar-group-content"><div class="recordings-scroll"><p id="recordingUnavailable" class="help">Loading recordings…</p><section id="recordingBar" class="recording-bar" aria-label="Local recordings" hidden><label for="recordingSelect">Recording</label><select id="recordingSelect" size="9" disabled aria-label="Recordings"><option value="">Current recording</option></select><p id="recordingStatus" class="help">Loading recordings…</p><div id="recordingError" class="workbench-error" role="status" hidden></div></section><section id="preparationStatus" class="job-card" aria-label="Video preparation progress" hidden><div class="job-title"><strong id="preparationTitle">Preparing frames</strong><button id="openPreparedRecording" class="small" hidden>Open recording</button></div><p id="preparationMessage"></p><div class="progress"><div id="preparationProgress"></div></div><div id="preparationCounts" class="model-detail"></div><details><summary class="help">Details and log</summary><div id="preparationPath" class="model-detail"></div><pre id="preparationLog" class="job-log"></pre></details></section></div><div class="recording-footer"><button id="browseVideo" class="small" disabled>Browse video…</button><button id="openPreparation" class="small" disabled>Prepare frames…</button></div></div></details></section></aside>
+<section id="recordingsPanel" class="sidebar-panel" role="tabpanel" aria-labelledby="recordingsTab" hidden><details class="sidebar-group" data-sidebar-group="recordings" open><summary>Recordings</summary><div class="sidebar-group-content"><div class="recordings-scroll"><p id="recordingUnavailable" class="help">Loading recordings…</p><section id="recordingBar" class="recording-bar" aria-label="Local recordings" hidden><label for="recordingSelect">Recording</label><select id="recordingSelect" size="9" disabled aria-label="Recordings"><option value="">Current recording</option></select><p id="recordingStatus" class="help">Loading recordings…</p><div id="recordingError" class="workbench-error" role="status" hidden></div></section><section id="preparationStatus" class="job-card" aria-label="Video preparation progress" hidden><div class="job-title"><strong id="preparationTitle">Preparing frames</strong><button id="openPreparedRecording" class="small" hidden>Open recording</button></div><div class="lifecycle-buttons"><button id="cancelPreparation" class="small" hidden>Cancel preparation</button><button id="resumePreparation" class="small" hidden>Resume preparation</button></div><p id="preparationMessage"></p><div class="progress"><div id="preparationProgress"></div></div><div id="preparationCounts" class="model-detail"></div><details><summary class="help">Details and log</summary><div id="preparationPath" class="model-detail"></div><pre id="preparationLog" class="job-log"></pre></details></section></div><div class="recording-footer"><button id="browseVideo" class="small" disabled>Browse video…</button><button id="openPreparation" class="small" disabled>Prepare frames…</button><button id="resumeRecording" class="small" hidden>Resume preparation</button><button id="deleteRecording" class="small danger" disabled>Delete recording</button><p id="deleteRecordingReason" class="delete-reason" hidden></p><button id="openDeletedItems" class="small">Deleted items…</button></div></div></details></section></aside>
 <main><div id="running" class="running" hidden>Preparing frames. Open this recording again when it finishes.</div><div class="heading"><div><h1 id="frameTitle">Loading frames</h1><div id="meta" class="meta"></div></div></div>
-<section id="modelBar" class="model-bar" aria-label="Models and training"><div class="model-label"><label for="modelSelect">Model</label><select id="modelSelect" disabled><option value="">Loading models…</option></select><span id="activeModelBadge" class="pill" hidden>Default</span></div><button id="browseModel" class="small" type="button" disabled>Browse model…</button><button id="convertModel" class="small" type="button" disabled>Convert model…</button><button id="useModel" class="small" disabled>Use as default</button><button id="downloadOnnx" class="small" disabled>Download .onnx</button><button id="downloadPt" class="small" disabled>Download .pt</button><button id="openTraining" class="small training-open" disabled>Train…</button><p id="workbenchStatus" class="help">Loading models…</p><div id="workbenchError" class="workbench-error" role="status" hidden></div><div id="modelImportStatus" class="model-import-status" role="status" aria-live="polite" hidden><strong id="modelImportState"></strong><span id="modelImportMessage"></span></div></section>
-<section id="trainingStatus" class="job-card" aria-label="Training progress" hidden><div class="job-title"><strong id="jobTitle">Training</strong><button id="viewTraining" class="small">View options</button></div><p id="jobMessage"></p><div class="progress"><div id="jobProgress"></div></div><div id="trainingMetrics" class="training-metrics"><p id="metricEpoch" class="metric-epoch">No completed epoch metrics yet.</p><div class="metric-summary"><div class="metric-value"><span>Train box loss</span><strong data-metric="train_box_loss">—</strong></div><div class="metric-value"><span>Val box loss</span><strong data-metric="val_box_loss">—</strong></div><div class="metric-value"><span>Val class loss</span><strong data-metric="val_cls_loss">—</strong></div><div class="metric-value"><span>mAP50</span><strong data-metric="map50">—</strong></div><div class="metric-value"><span>Precision</span><strong data-metric="precision">—</strong></div></div><div id="trainingPlots" class="training-plots"><section id="lossPlot" class="training-plot" aria-label="Training and validation loss"></section><section id="qualityPlot" class="training-plot" aria-label="Validation mAP50 and precision"></section></div></div><details id="trainingLogDetails" class="training-log-details" hidden><summary>Training details and log</summary><div id="jobPath" class="model-detail"></div><pre id="jobLog" class="job-log"></pre></details><div id="trainingDownloads" class="actions-group" hidden><button id="downloadTrainedOnnx" class="small">Download .onnx</button><button id="downloadTrainedPt" class="small">Download .pt</button></div></section>
+<section id="modelBar" class="model-bar" aria-label="Models and training"><div class="model-label"><label for="modelSelect">Model</label><select id="modelSelect" disabled><option value="">Loading models…</option></select><span id="activeModelBadge" class="pill" hidden>Default</span></div><button id="browseModel" class="small" type="button" disabled>Browse model…</button><button id="convertModel" class="small" type="button" disabled>Convert model…</button><button id="deleteModel" class="small danger" type="button" disabled>Delete model</button><button id="useModel" class="small" disabled>Use as default</button><button id="downloadOnnx" class="small" disabled>Download .onnx</button><button id="downloadPt" class="small" disabled>Download .pt</button><button id="openTraining" class="small training-open" disabled>Train…</button><p id="deleteModelReason" class="delete-reason" hidden></p><p id="workbenchStatus" class="help">Loading models…</p><div id="workbenchError" class="workbench-error" role="status" hidden></div><div id="modelImportStatus" class="model-import-status" role="status" aria-live="polite" hidden><strong id="modelImportState"></strong><span id="modelImportMessage"></span></div></section>
+<section id="trainingStatus" class="job-card" aria-label="Training progress" hidden><div class="job-title"><strong id="jobTitle">Training</strong><div class="lifecycle-buttons"><button id="toggleTrainingData" class="small" type="button" aria-expanded="true" aria-controls="trainingData">Collapse training data</button><button id="viewTraining" class="small">View options</button></div></div><p id="jobMessage"></p><div class="progress"><div id="jobProgress"></div></div><div id="trainingData"><div id="trainingMetrics" class="training-metrics"><p id="metricEpoch" class="metric-epoch">No completed epoch metrics yet.</p><div class="metric-summary"><div class="metric-value"><span>Train box loss</span><strong data-metric="train_box_loss">—</strong></div><div class="metric-value"><span>Val box loss</span><strong data-metric="val_box_loss">—</strong></div><div class="metric-value"><span>Val class loss</span><strong data-metric="val_cls_loss">—</strong></div><div class="metric-value"><span>mAP50</span><strong data-metric="map50">—</strong></div><div class="metric-value"><span>Precision</span><strong data-metric="precision">—</strong></div></div><div id="trainingPlots" class="training-plots"><section id="lossPlot" class="training-plot" aria-label="Training and validation loss"></section><section id="qualityPlot" class="training-plot" aria-label="Validation mAP50 and precision"></section></div></div><details id="trainingLogDetails" class="training-log-details" hidden><summary>Training details and log</summary><div id="jobPath" class="model-detail"></div><pre id="jobLog" class="job-log"></pre></details><div id="trainingDownloads" class="actions-group" hidden><button id="downloadTrainedOnnx" class="small">Download .onnx</button><button id="downloadTrainedPt" class="small">Download .pt</button></div></div></section>
 <section id="reviewControls" class="canvas-card review-controls" aria-label="Review tools"><div class="canvas-top"><button id="selectTool" class="active" title="Select, move, resize [V]">Select <kbd>V</kbd></button><button id="drawTool" title="Draw rectangle [D]">Draw <kbd>D</kbd></button><span class="divider"></span><button id="labelsToggle" aria-pressed="false" title="Show class names over the crop">Labels off</button><button id="undo" title="Undo [Ctrl+Z]">Undo</button><button id="delete" title="Delete selected box [Delete]">Delete</button><span id="dirty" class="dirty" hidden>Unsaved</span><span class="divider"></span><label for="gridSize">View</label><select id="gridSize" aria-label="Frames per view"><option value="1">1 frame</option><option value="4">4 frames</option><option value="9">9 frames</option></select></div><div class="view-tools" aria-label="Image view controls"><button id="zoomOut" aria-label="Zoom out">−</button><output id="zoomLevel" aria-live="polite" aria-label="Image zoom">100%</output><button id="zoomIn" aria-label="Zoom in">+</button><button id="zoomReset" title="Fit the complete image">Fit</button><div id="frameNavigation" class="nav"><span id="position" class="muted" style="font-size:12px"></span><button id="previous" title="Previous frame [←]" aria-label="Previous frame">←</button><button id="next" title="Next frame [→]" aria-label="Next frame">→</button></div><div id="gridNavigation" class="nav" hidden><span id="gridPosition" class="muted"></span><button id="gridPrevious" aria-label="Previous grid page">←</button><button id="gridNext" aria-label="Next grid page">→</button></div></div><div id="gridReviewTools" class="grid-review-tools" role="group" aria-label="Review frames on this page" hidden><output id="gridSelectionCount" aria-live="polite" title="Ctrl-click frames to toggle selection. A normal click opens a frame.">0 selected</output><button id="gridApproveSelected" class="primary" disabled>Approve selected</button><button id="gridRejectSelected" class="danger" disabled>Reject selected</button><span class="divider"></span><button id="gridApproveAll" title="Approve all frames on this page" disabled>Approve all</button><button id="gridRejectAll" class="danger" title="Reject all frames on this page" disabled>Reject all</button></div></section><section id="gridView" aria-label="Frame contact sheet" hidden><div id="gridCards" class="grid-cards"></div></section><div id="editor" class="workspace"><section class="canvas-card"><div class="canvas-stage"><canvas id="canvas" width="640" height="448" tabindex="0" aria-label="640 by 448 video crop. Wheel to zoom. Drag empty space, hold Space, or middle-drag to pan. Alt-click cycles overlapping boxes."></canvas></div><div class="canvas-bottom"><span>640 × 448</span><span id="canvasHint">Select a box</span></div><div class="proposal-tools"><button id="suggestBoxes" disabled>Suggest boxes</button><label for="proposalConfidence">Confidence <input id="proposalConfidence" type="number" min="0.05" max="0.95" step="0.05" value="0.25"></label><label><input id="proposalTiles" type="checkbox" checked> Small-object tiles</label><label class="assist-option"><input id="proposalAssist" type="checkbox" checked> Recover missing parts <small>Focused rescans and estimated partner boxes.</small></label></div><div id="proposalPreview" class="proposal-review" hidden><div class="proposal-tools proposal-preview"><span id="proposalSummary"></span><button id="applyProposals" class="small" title="Add model detections only. Review estimates individually below.">Merge unique boxes</button><button id="discardProposals" class="small">Discard preview</button></div><ul id="proposalWarnings" class="proposal-warnings" hidden></ul><p id="estimateHelp" class="estimate-help" hidden>Amber ? boxes are estimates. Review each before use.</p><div id="proposalEstimates" class="estimate-list" hidden></div></div></section>
 <section class="inspect"><div><h2>Add box</h2><div class="legend"><span class="swatch"></span>Head <span class="swatch body" style="margin-left:8px"></span>Body</div><div class="class-tools"><button id="headClass" class="active">Head <kbd>1</kbd></button><button id="bodyClass">Body <kbd>2</kbd></button></div><h2 id="boxCount">0 boxes</h2></div><div id="boxes" class="boxes"></div><div class="selected-controls"><label for="selectedClass" class="muted" style="font-size:11px">Selected box</label><select id="selectedClass" disabled><option value="0">Head</option><option value="1">Body</option></select><div id="coordinates" class="muted" style="font-size:11px">No box selected.</div></div><div id="flags" class="flags"></div></section></div>
 <div id="empty" class="empty" hidden><strong>No frames in this view</strong>Choose another filter to continue.</div>
 <div class="actions"><div class="actions-group"><button id="reject" class="danger">Reject frame</button><button id="save">Save pending</button><button id="restorePending" hidden>Restore to pending</button></div><div class="actions-group"><button id="export" title="Export saved, approved frames from this recording">Export reviewed</button><button id="approve" class="primary">Approve & next</button></div></div><div id="exportHelp" class="help" hidden>Save changes before exporting. Only saved, approved frames are included.</div><div id="notice" class="notice" role="status" aria-live="polite" hidden></div><div id="exportResult" class="export-result"></div>
 </main></div>
+<dialog id="deleteDialog" aria-labelledby="deleteTitle"><h2 id="deleteTitle">Delete item?</h2><strong id="deleteTarget"></strong><p id="deleteDescription"></p><p id="deleteGuard" class="delete-guard" role="status" hidden></p><div id="deleteError" class="workbench-error" role="alert" hidden></div><div class="actions-group"><button id="cancelDelete" type="button">Keep item</button><button id="confirmDelete" class="danger" type="button">Delete</button></div></dialog>
+<dialog id="deletedItemsDialog" class="deleted-items-dialog" aria-labelledby="deletedItemsTitle"><div class="dialog-title"><h2 id="deletedItemsTitle">Deleted items</h2><button id="closeDeletedItems" class="small" type="button">Close</button></div><p>Restore models and prepared recordings to their original locations.</p><p id="deletedItemsMessage" role="status" aria-live="polite"></p><div id="deletedItemsError" class="workbench-error" role="alert" hidden></div><div id="deletedItemsList" class="deleted-list"></div></dialog>
 <dialog id="modelImportDialog" class="model-import-dialog" aria-labelledby="modelImportTitle"><div class="dialog-title"><h2 id="modelImportTitle">Import model</h2><button id="closeModelImport" class="small" type="button" aria-label="Close model import">Close</button></div><div class="model-import-source"><strong id="pickedModelName"></strong><small id="pickedModelPath"></small></div><form id="modelImportForm" novalidate><label id="modelConversionTargetLabel" class="model-import-target" for="modelConversionTarget" hidden>Output format<select id="modelConversionTarget"><option value="onnx">ONNX (.onnx)</option><option value="pt">Matching checkpoint (.pt)</option></select></label><p id="modelImportFormatNote"></p><div id="modelImportDimensions" class="model-import-grid" hidden><label for="modelImportWidth">ONNX width<input id="modelImportWidth" type="number" min="64" max="1280" step="32" value="640" required></label><label for="modelImportHeight">ONNX height<input id="modelImportHeight" type="number" min="64" max="1280" step="32" value="448" required></label></div><label id="modelImportAutoLabel" class="training-toggle"><input id="modelImportAutoActivate" type="checkbox" checked><span>Apply automatically</span></label><div id="modelImportError" class="workbench-error" role="alert" hidden></div><div class="actions-group"><button id="startModelImport" class="primary" type="submit">Import model</button></div></form></dialog>
 <dialog id="assistantDialog" class="assistant-dialog" aria-labelledby="assistantDialogTitle"><div class="dialog-title"><h2 id="assistantDialogTitle">Connect assistant</h2><button id="closeAssistant" class="small" type="button" aria-label="Close assistant connection">Close</button></div><form id="assistantForm"><p>Connect an assistant to this recording. Assistant boxes appear as dashed Head and Body boxes in pending frames.</p><label for="assistantProvider">Provider</label><select id="assistantProvider"><option value="antigravity">Antigravity</option></select><label for="assistantName">Connection name</label><input id="assistantName" type="text" maxlength="80" value="Antigravity" autocomplete="off" required><p>Connecting shares API access. Run your assistant when you are ready to process frames and use your provider quota.</p><div id="assistantConnectError" class="workbench-error" role="alert" hidden></div><div class="actions-group"><button id="createAssistant" class="primary" type="submit">Connect assistant</button></div></form><section id="assistantSetup" hidden><p class="assistant-one-time">Copy this configuration now. The connection secret is shown once and cleared when you close this window.</p><label for="assistantConfig">API configuration</label><textarea id="assistantConfig" readonly spellcheck="false" hidden aria-label="One-time assistant API configuration"></textarea><div class="assistant-copy-row"><p class="help">Keep this file private.</p><button id="copyAssistantConfig" class="small" type="button">Copy configuration</button></div><label for="assistantInstructions">Bridge instructions</label><textarea id="assistantInstructions" readonly spellcheck="false" aria-label="Assistant bridge instructions"></textarea><div class="assistant-copy-row"><p class="help">Only your assistant starts model calls.</p><button id="copyAssistantInstructions" class="small" type="button">Copy instructions</button></div><p id="assistantCopyStatus" class="assistant-message" role="status" aria-live="polite"></p></section></dialog>
 <dialog id="gridEmptyDialog"><h2>Approve empty frames?</h2><p id="gridEmptyMessage"></p><div class="actions-group"><button id="cancelGridEmpty">Keep reviewing</button><button id="confirmGridEmpty" class="primary">Approve frames</button></div></dialog>
@@ -88,9 +91,11 @@ let busy = false, loadSequence = 0, dirty = false, currentFilter = "pending";
 let editVersion = 0, proposalSequence = 0, proposal = null, proposing = false;
 let workbench = null, workbenchLoading = false, workbenchAction = false, workbenchGeneration = 0, selectedModelId = "", trainingFormReady = false, modelDownloading = false;
 let modelImportSelection=null, modelImportMode="import", handledModelImportId="";
+let trainingDataExpanded=true;
 let trainingRecordingIds=new Set(), validationRecordingIds=new Set(), trainingRecordingsReady=false, trainingRecordingSignature="", trainingMetricsSignature="";
 let recordingLibrary=null, recordingLibraryLoading=false, recordingAction=false, recordingLibraryGeneration=0;
 let selectedRecordingId="", recordingSequence=0, manifestSequence=0, pickedVideo=null, preparationFormReady=false;
+let lifecycleAction=false, pendingDelete=null, deletedItems=[], deletedItemsLoading=false, deletedItemsSequence=0;
 let gridSize=1, gridPage=0, gridSequence=0, gridLoads=[];
 let gridSelection=new Set(), gridSelectionContext="", pendingGridReview=null, pendingEmptyReview=null;
 let emptyScan=null, emptyScanLoading=false, emptyScanAction=false, emptyScanSequence=0, emptyScanAvailable=true;
@@ -139,8 +144,8 @@ async function api(path, payload, recordingId=selectedRecordingId) {
   return data;
 }
 function visibleFrames() { return manifest ? manifest.frames.filter(item => currentFilter === "all" || item.status === currentFilter) : []; }
-function canReview() { return gridSize===1 && !!frame && !!image && !busy && manifest?.status === "complete"; }
-function canEdit() { return gridSize===1 && !!frame && frame.status!=="auto_removed" && !!image && !busy && manifest?.status === "complete"; }
+function canReview() { return gridSize===1 && !!frame && !!image && !busy && !lifecycleAction && manifest?.status === "complete"; }
+function canEdit() { return gridSize===1 && !!frame && frame.status!=="auto_removed" && !!image && !busy && !lifecycleAction && manifest?.status === "complete"; }
 function updateButtons() {
   const editable = canEdit() && !drag, reviewable=canReview() && !drag;
   for (const id of ["drawTool","headClass","bodyClass","save","approve"]) $(id).disabled = !editable;
@@ -161,7 +166,7 @@ function updateButtons() {
   $("previous").disabled = busy || index <= 0; $("next").disabled = busy || index < 0 || index >= list.length - 1;
   $("position").textContent = index < 0 ? "0 frames" : `${index + 1} / ${list.length}`;
   $("dirty").hidden = !dirty;
-  $("connectAssistant").disabled=assistantAction || !assistantsAvailable || !manifest || !["complete","running"].includes(manifest.status);
+  $("connectAssistant").disabled=assistantAction || !assistantsAvailable || manifest?.status!=="complete";
   for(const id of ["save","reject","approve"]) $(id).hidden=gridSize!==1;
   if(frame?.status==="auto_removed") $("save").hidden=true;
   $("gridSize").disabled=busy || !!drag;
@@ -466,6 +471,8 @@ async function showFrame(id) {
 }
 async function loadManifest() {
   if (busy || !discardOkay()) return;
+  const recording=recordingLibrary?.recordings?.find(item=>item.id===selectedRecordingId);
+  if(recording && recording.status!=="complete") { await clearRecordingReview(recording); return; }
   const generation=recordingSequence, recordingId=selectedRecordingId, request=++manifestSequence;
   const current=()=>generation===recordingSequence && request===manifestSequence;
   busy=true; updateButtons();
@@ -554,7 +561,7 @@ async function refreshScanManifest() {
   finally { if(generation===recordingSequence) { scanManifestLoading=false; updateEmptyScanControls(); } }
 }
 async function refreshEmptyScan() {
-  if(emptyScanLoading || emptyScanAction) return;
+  if(emptyScanLoading || emptyScanAction || manifest?.status!=="complete") return;
   const generation=recordingSequence, recordingId=selectedRecordingId, request=++emptyScanSequence;
   emptyScanLoading=true;
   try {
@@ -590,7 +597,7 @@ function assistantStatus(value) {
   return ({connected:"Connected",waiting:"Waiting for bridge",active:"Active",idle:"Waiting for bridge",offline:"Offline",online:"Online",expired:"Access expired",disconnected:"Disconnected",revoked:"Disconnected",error:"Needs attention"})[value] || "Waiting for bridge";
 }
 function renderAssistants() {
-  $("connectAssistant").disabled=assistantAction || !assistantsAvailable || !manifest || !["complete","running"].includes(manifest.status);
+  $("connectAssistant").disabled=assistantAction || !assistantsAvailable || manifest?.status!=="complete";
   const provider=$("assistantProvider"), selectedProvider=provider.value;
   const choices=assistantProviders.filter(value=>["antigravity","custom"].includes(value));
   if(JSON.stringify([...provider.options].map(option=>option.value))!==JSON.stringify(choices)) { provider.replaceChildren(); for(const value of choices) { const option=document.createElement("option"); option.value=value; option.textContent=value==="antigravity"?"Antigravity":"Other AI"; provider.append(option); } if(choices.includes(selectedProvider)) provider.value=selectedProvider; }
@@ -650,7 +657,7 @@ async function refreshAssistantManifest() {
   finally { if(generation===recordingSequence) assistantManifestLoading=false; }
 }
 async function refreshAssistants() {
-  if(assistantLoading || assistantAction) return;
+  if(assistantLoading || assistantAction || manifest?.status!=="complete") return;
   const generation=recordingSequence, recordingId=selectedRecordingId, request=++assistantSequence; assistantLoading=true;
   try {
     const result=await api("/api/assistants",undefined,recordingId);
@@ -661,7 +668,7 @@ async function refreshAssistants() {
     assistantConnections=connections; assistantProviders=providers; assistantLoaded=true; assistantsAvailable=true; assistantMessage(); if(changed || connections.some(connection=>connection.usage?.windows?.some(window=>window.reset_at && new Date(typeof window.reset_at==="number" && window.reset_at<1e12?window.reset_at*1000:window.reset_at).getTime()<Date.now()))) renderAssistants();
     if(connections.some(connection=>!["revoked","disconnected","expired"].includes(connection.status))) await refreshAssistantManifest();
   } catch(error) { if(generation===recordingSequence && request===assistantSequence) { if(error.status===404) assistantsAvailable=false; assistantMessage(error.status===404?"Connections unavailable on this server.":"Connections could not refresh. Will retry.",error.status!==404); renderAssistants(); } }
-  finally { if(generation===recordingSequence && request===assistantSequence) { assistantLoading=false; $("connectAssistant").disabled=assistantAction || !assistantsAvailable || !manifest || !["complete","running"].includes(manifest.status); } }
+  finally { if(generation===recordingSequence && request===assistantSequence) { assistantLoading=false; $("connectAssistant").disabled=assistantAction || !assistantsAvailable || manifest?.status!=="complete"; } }
 }
 async function createAssistant(event) {
   event.preventDefault(); if(assistantAction) return;
@@ -714,7 +721,7 @@ function updateRecordingControls() {
   const ready=!!recordingLibrary, available=ready && !recordingAction;
   $("recordingUnavailable").hidden=ready;
   if(!ready) $("recordingUnavailable").textContent=$("recordingStatus").textContent;
-  $("recordingSelect").disabled=!ready || !!drag;
+  $("recordingSelect").disabled=!ready || recordingAction || lifecycleAction || busy || !!drag;
   $("browseVideo").disabled=!available; $("browseAnotherVideo").disabled=!available;
   $("browseVideo").textContent=recordingAction?"Working…":"Browse video…";
   $("openPreparation").disabled=!available || !pickedVideo;
@@ -723,14 +730,27 @@ function updateRecordingControls() {
   $("preparationModel").textContent=model?`Model: ${model.label}`:"Select a model before preparing frames.";
   const job=recordingLibrary?.preparation, completed=job?.state==="completed" && !!job.recording_id;
   $("openPreparedRecording").hidden=!completed;
-  $("openPreparedRecording").disabled=!completed || !(recordingLibrary?.recordings||[]).some(item=>item.id===job.recording_id) || !!drag;
+  $("openPreparedRecording").disabled=!available || !completed || !(recordingLibrary?.recordings||[]).some(item=>item.id===job.recording_id && item.status==="complete") || busy || !!drag;
+  const cancel=job && ["queued","running"].includes(job.state) && job.can_cancel!==false && !job.cancel_requested;
+  $("cancelPreparation").hidden=!cancel; $("cancelPreparation").disabled=!available || lifecycleAction || workbenchAction;
+  $("cancelPreparation").textContent="Cancel preparation";
+  const resume=job && ["failed","interrupted","cancelled"].includes(job.state) && job.can_resume===true;
+  $("resumePreparation").hidden=!resume; $("resumePreparation").disabled=!available || lifecycleAction || workbenchAction || preparationActive();
+  const recording=recordingLibrary?.recordings?.find(item=>item.id===selectedRecordingId), historical=recording?.status!=="complete" && recording?.resume_job_id;
+  $("resumeRecording").hidden=!historical; $("resumeRecording").disabled=!available || lifecycleAction || workbenchAction || preparationActive();
+  const reason=deletionReason("recording",recording);
+  $("deleteRecording").disabled=!available || lifecycleAction || workbenchAction || busy || !!drag || !!reason;
+  $("deleteRecording").title=reason || "Move prepared frames to Deleted items. Keep the original video.";
+  $("deleteRecordingReason").textContent=reason; $("deleteRecordingReason").hidden=!reason;
+  $("openDeletedItems").disabled=lifecycleAction;
+  updateDeleteDialog();
 }
 function renderRecordings() {
   if(drag) return;
   $("recordingBar").hidden=false;
   const recordings=recordingLibrary.recordings||[];
-  if(!selectedRecordingId && recordingLibrary.default_recording_id) selectedRecordingId=recordingLibrary.default_recording_id;
-  const choices=recordings.map(item=>({id:item.id,label:`${item.label || item.source_name || item.id} · ${item.frames || 0} frames${item.status==="running"?" · preparing":["failed","interrupted"].includes(item.status)?` · ${item.status}`:""}`,disabled:!["running","complete"].includes(item.status)}));
+  if(!selectedRecordingId && recordings.some(item=>item.id===recordingLibrary.default_recording_id)) selectedRecordingId=recordingLibrary.default_recording_id;
+  const choices=recordings.map(item=>({id:item.id,label:`${item.label || item.source_name || item.id} · ${item.frames || 0} frames${item.status==="running"?" · preparing":["failed","interrupted","cancelled"].includes(item.status)?` · ${item.status}`:""}`,disabled:false}));
   if(!choices.some(item=>item.id===selectedRecordingId)) choices.unshift({id:selectedRecordingId,label:!selectedRecordingId && !recordings.length?"No recordings":"Current recording · unavailable in library",disabled:true});
   const control=$("recordingSelect"), existing=[...control.options].map(option=>({id:option.value,label:option.textContent,disabled:option.disabled}));
   if(JSON.stringify(choices)!==JSON.stringify(existing)) {
@@ -742,9 +762,9 @@ function renderRecordings() {
   $("recordingStatus").title=selectedRecording?.path || ""; $("recordingSelect").title=selectedRecording?.path || "";
   const job=recordingLibrary.preparation; $("preparationStatus").hidden=!job;
   if(job) {
-    $("preparationStatus").classList.toggle("failed",["failed","interrupted"].includes(job.state));
+    $("preparationStatus").classList.toggle("failed",["failed","interrupted","cancelled"].includes(job.state));
     $("preparationTitle").textContent=`Preparation ${job.state}`;
-    $("preparationMessage").textContent=job.message || "Waiting for worker…";
+    $("preparationMessage").textContent=job.cancel_requested?"Stopping after the current step. Saved frames will be kept.":job.message || "Waiting for worker…";
     $("preparationProgress").style.width=`${Math.min(100,Math.max(0,Number(job.progress)||0))}%`;
     const processed=Number.isFinite(job.processed)?job.processed:0, total=Number.isFinite(job.total)?job.total:null;
     $("preparationCounts").textContent=`${processed}${total!==null?` / ${total}`:""} samples · ${Number.isFinite(job.saved)?job.saved:0} frames saved`;
@@ -765,7 +785,7 @@ async function refreshRecordings() {
   finally { recordingLibraryLoading=false; updateRecordingControls(); }
 }
 async function openRecording(id) {
-  if(drag || !(recordingLibrary?.recordings||[]).some(item=>item.id===id && ["running","complete"].includes(item.status))) { $("recordingSelect").value=selectedRecordingId; return; }
+  if(drag || busy || lifecycleAction || recordingAction || !(recordingLibrary?.recordings||[]).some(item=>item.id===id)) { $("recordingSelect").value=selectedRecordingId; return; }
   if(id===selectedRecordingId) { await loadManifest(); return; }
   if(!discardOkay()) { $("recordingSelect").value=selectedRecordingId; return; }
   selectedRecordingId=id; recordingSequence++; manifestSequence++; busy=false;
@@ -773,7 +793,112 @@ async function openRecording(id) {
   view={scale:1,x:0,y:0}; manifest={status:"loading",frames:[]};
   $("exportResult").textContent=""; $("emptyDialog").close();
   await showFrame(undefined); $("frameTitle").textContent="Loading recording…";
-  renderRecordings(); await loadManifest(); refreshEmptyScan(); refreshAssistants();
+  renderRecordings(); await loadManifest(); if(manifest?.status==="complete") { refreshEmptyScan(); refreshAssistants(); }
+}
+async function clearRecordingReview(recording=null) {
+  loadSequence++; manifestSequence++; clearGridImages(); resetGridSelection(); resetEmptyScan(); resetAssistants();
+  manifest={status:recording?.status || "unavailable",frames:[]}; busy=false; gridPage=0; view={scale:1,x:0,y:0};
+  await showFrame(undefined); $("frameTitle").textContent=recording?"Preparation unfinished":"No recording selected";
+  notice(recording?"Resume preparation to finish this recording before reviewing its saved frames.":"Choose a recording or prepare a video.");
+}
+function deletionReason(kind,item) {
+  if(!item) return kind==="model"?"Select a model to delete.":"Select a recording to delete.";
+  if(kind==="model" && (item.builtin || item.is_builtin || item.source==="builtin" || item.family==="builtin" || String(item.id).startsWith("builtin-"))) return item.delete_reason || "Included models are kept with the app.";
+  if(kind==="model" && (item.is_active || item.id===workbench?.active_model_id)) return item.delete_reason || "Choose another default model before deleting this model.";
+  return item.can_delete===false?(item.delete_reason || "This item is in use. Finish its active work before deleting it."):"";
+}
+function updateDeleteDialog() {
+  if(!pendingDelete) return;
+  const items=pendingDelete.kind==="model"?workbench?.models:recordingLibrary?.recordings, item=items?.find(entry=>entry.id===pendingDelete.id);
+  let reason=deletionReason(pendingDelete.kind,item);
+  if(!reason && pendingDelete.kind==="recording" && pendingDelete.id===selectedRecordingId && dirty) reason="This recording has unsaved box corrections. Save your changes before deleting it.";
+  $("deleteGuard").textContent=reason; $("deleteGuard").hidden=!reason;
+  $("confirmDelete").disabled=lifecycleAction || workbenchAction || recordingAction || busy || !!drag || !!reason;
+  $("cancelDelete").disabled=lifecycleAction;
+  $("confirmDelete").textContent=lifecycleAction?"Deleting…":"Delete";
+}
+function openDelete(kind) {
+  if(lifecycleAction || workbenchAction || recordingAction || busy || drag) return;
+  const id=kind==="model"?selectedModelId:selectedRecordingId, items=kind==="model"?workbench?.models:recordingLibrary?.recordings, item=items?.find(entry=>entry.id===id);
+  if(!item || deletionReason(kind,item)) return;
+  pendingDelete={kind,id}; $("deleteTitle").textContent=kind==="model"?"Delete model?":"Delete recording?";
+  $("deleteTarget").textContent=item.label || item.source_name || id;
+  $("deleteDescription").textContent=kind==="model"?"Move this model to Deleted items. You can restore it later.":"Move the prepared frames and saved reviews to Deleted items. The original video is kept. You can restore this recording later.";
+  $("deleteError").hidden=true; updateDeleteDialog(); $("deleteDialog").showModal();
+}
+function closeDelete() { if(lifecycleAction) return; $("deleteDialog").close(); pendingDelete=null; }
+function deletedItemsError(message="") { $("deletedItemsError").textContent=message; $("deletedItemsError").hidden=!message; }
+function renderDeletedItems() {
+  $("deletedItemsList").replaceChildren();
+  $("deletedItemsMessage").textContent=deletedItemsLoading?"Loading deleted items…":deletedItems.length?"Choose an item to restore.":"No deleted items.";
+  for(const item of deletedItems) {
+    const row=document.createElement("div"),copy=document.createElement("div"),label=document.createElement("strong"),detail=document.createElement("p"),location=document.createElement("p"),button=document.createElement("button");
+    row.className="deleted-item"; copy.className="deleted-item-copy"; label.textContent=item.label || item.id;
+    const date=new Date(item.deleted_at), dateLabel=Number.isNaN(date.getTime())?String(item.deleted_at || ""):date.toLocaleString();
+    detail.textContent=(item.kind==="model"?"Model":"Recording")+(dateLabel?" · "+dateLabel:""); location.textContent=item.original_path || ""; location.className="model-detail";
+    button.type="button"; button.className="small"; button.textContent="Restore"; button.dataset.restoreId=item.id; button.disabled=lifecycleAction || deletedItemsLoading; button.onclick=()=>restoreDeletedItem(item.id);
+    copy.append(label,detail,location); row.append(copy,button); $("deletedItemsList").append(row);
+  }
+  $("closeDeletedItems").disabled=lifecycleAction;
+}
+async function refreshDeletedItems() {
+  const request=++deletedItemsSequence; deletedItemsLoading=true; deletedItemsError(); renderDeletedItems();
+  try { const result=await api("/api/deleted-items"); if(request!==deletedItemsSequence) return; deletedItems=Array.isArray(result.items)?result.items:[]; }
+  catch(error) { if(request===deletedItemsSequence) deletedItemsError(error.message); }
+  finally { if(request===deletedItemsSequence) { deletedItemsLoading=false; renderDeletedItems(); } }
+}
+async function libraryAction(path,payload) {
+  if(lifecycleAction || workbenchAction || recordingAction || drag) return null;
+  lifecycleAction=true; workbenchAction=true; recordingAction=true; workbenchGeneration++; recordingLibraryGeneration++; updateButtons(); renderDeletedItems();
+  try {
+    const result=await api(path,payload);
+    if(path==="/api/models/delete" && workbench) workbench.models=workbench.models.filter(item=>item.id!==payload.model_id);
+    if(path==="/api/recordings/delete" && recordingLibrary) { recordingLibrary.recordings=recordingLibrary.recordings.filter(item=>item.id!==payload.recording_id); trainingRecordingIds.delete(payload.recording_id); validationRecordingIds.delete(payload.recording_id); }
+    if(path==="/api/deleted-items/restore") deletedItems=deletedItems.filter(item=>item.id!==payload.trash_id);
+    const catalogs=await Promise.allSettled([api("/api/workbench"),api("/api/recordings")]);
+    if(catalogs[0].status==="fulfilled") workbench=catalogs[0].value;
+    if(catalogs[1].status==="fulfilled") recordingLibrary=catalogs[1].value;
+    if(workbench) renderWorkbench(); if(recordingLibrary) renderRecordings();
+    const failures=catalogs.filter(item=>item.status==="rejected"); if(failures.length) notice("Action saved. The library will refresh when the server is available.",true);
+    return result;
+  } finally { lifecycleAction=false; workbenchAction=false; recordingAction=false; updateButtons(); renderDeletedItems(); }
+}
+async function confirmDelete() {
+  updateDeleteDialog(); if($("confirmDelete").disabled || !pendingDelete) return;
+  const target={...pendingDelete}, selectedRecording=selectedRecordingId, generation=recordingSequence;
+  $("deleteError").hidden=true;
+  try {
+    const key=target.kind==="model"?"model_id":"recording_id", result=await libraryAction(target.kind==="model"?"/api/models/delete":"/api/recordings/delete",{[key]:target.id}); if(!result) return;
+    if(target.kind==="recording" && selectedRecording===target.id && generation===recordingSequence) {
+      selectedRecordingId=""; recordingSequence++; manifestSequence++; await clearRecordingReview();
+      const recordings=recordingLibrary?.recordings || [], next=recordings.find(item=>item.id===recordingLibrary.default_recording_id) || recordings.find(item=>item.status==="complete") || recordings[0];
+      if(next) { selectedRecordingId=next.id; renderRecordings(); await loadManifest(); if(manifest?.status==="complete") { refreshEmptyScan(); refreshAssistants(); } } else if(recordingLibrary) renderRecordings();
+    }
+    closeDelete(); notice(target.kind==="model"?"Model moved to Deleted items.":"Recording moved to Deleted items. Original video kept.");
+  } catch(error) { $("deleteError").textContent=error.message; $("deleteError").hidden=false; updateDeleteDialog(); }
+}
+async function restoreDeletedItem(id) {
+  if(lifecycleAction || deletedItemsLoading || !deletedItems.some(item=>item.id===id)) return;
+  const target=deletedItems.find(item=>item.id===id), hadRecording=recordingLibrary?.recordings?.some(item=>item.id===selectedRecordingId), generation=recordingSequence;
+  deletedItemsError();
+  try {
+    const result=await libraryAction("/api/deleted-items/restore",{trash_id:id}); if(!result) return;
+    if(target.kind==="recording" && !hadRecording && generation===recordingSequence) {
+      const restored=recordingLibrary?.recordings?.find(item=>item.id===(result.item?.id || result.id));
+      if(restored) { await openRecording(restored.id); if(manifest?.status==="complete") { refreshEmptyScan(); refreshAssistants(); } }
+    }
+    await refreshDeletedItems(); notice("Item restored.");
+  }
+  catch(error) { deletedItemsError(error.message); }
+}
+async function preparationCommand(action,historical=false) {
+  const job=recordingLibrary?.preparation, recording=recordingLibrary?.recordings?.find(item=>item.id===selectedRecordingId);
+  const jobId=historical?recording?.resume_job_id:job?.id;
+  const valid=action==="cancel"?job && ["queued","running"].includes(job.state) && job.can_cancel!==false && !job.cancel_requested:!preparationActive() && (historical?recording?.status!=="complete" && !!jobId:job?.can_resume===true && ["failed","interrupted","cancelled"].includes(job.state));
+  if(!jobId || !valid) return;
+  recordingError();
+  try { const result=await libraryAction("/api/recordings/"+action,{job_id:jobId}); if(result) notice(action==="cancel"?"Cancellation requested. Saved frames are kept.":"Preparation resumed from its saved progress."); }
+  catch(error) { recordingError(error.message); }
 }
 function openPreparation() {
   if(!pickedVideo || !recordingLibrary) return;
@@ -868,6 +993,18 @@ function renderTrainingRecordings() {
   }
   updateTrainingSelection();
 }
+function setTrainingDataExpanded(expanded,persist=false) {
+  trainingDataExpanded=expanded; $("trainingData").hidden=!expanded;
+  $("toggleTrainingData").setAttribute("aria-expanded",String(expanded));
+  $("toggleTrainingData").textContent=expanded?"Collapse training data":"Expand training data";
+  if(persist) { try { localStorage.setItem("head-body-review:training-data:expanded:v1",String(expanded)); } catch(error) { } }
+  fitGridToViewport();
+}
+function setupTrainingData() {
+  try { trainingDataExpanded=localStorage.getItem("head-body-review:training-data:expanded:v1")!=="false"; } catch(error) { }
+  setTrainingDataExpanded(trainingDataExpanded);
+  $("toggleTrainingData").onclick=()=>setTrainingDataExpanded(!trainingDataExpanded,true);
+}
 function trainingMetricValue(value,percent=false) { return Number.isFinite(value)?(percent?`${Number((value*100).toFixed(1))}%`:String(Number(value.toFixed(4)))):"—"; }
 function renderTrainingPlot(id,title,history,series,quality=false) {
   const container=$(id); container.replaceChildren();
@@ -927,6 +1064,10 @@ function renderTrainingMetrics(job) {
 function updateWorkbenchControls() {
   const ready=!!workbench && !workbenchAction, model=workbench?.models?.find(item=>item.id===selectedModelId);
   $("modelSelect").disabled=!ready || !workbench.models.length;
+  const deleteReason=deletionReason("model",model);
+  $("deleteModel").disabled=!ready || recordingAction || lifecycleAction || busy || !!drag || !!deleteReason;
+  $("deleteModel").title=deleteReason || "Move this model to Deleted items.";
+  $("deleteModelReason").textContent=deleteReason; $("deleteModelReason").hidden=!deleteReason;
   $("browseModel").disabled=!ready || modelImportActive();
   $("convertModel").disabled=!ready || !model || modelImportActive();
   $("startModelImport").disabled=!ready || !modelImportSelection || modelImportActive() || (modelImportMode==="convert" && !workbench.models.find(item=>item.id===modelImportSelection.id)?.formats?.includes("pt"));
@@ -1323,6 +1464,13 @@ $("preparationForm").onsubmit=async event=>{
   catch(error) { $("preparationError").textContent=error.message; }
   finally { recordingAction=false; updateRecordingControls(); }
 };
+$("deleteModel").onclick=()=>openDelete("model"); $("deleteRecording").onclick=()=>openDelete("recording");
+$("confirmDelete").onclick=confirmDelete; $("cancelDelete").onclick=closeDelete;
+$("deleteDialog").addEventListener("cancel",event=>{ event.preventDefault(); closeDelete(); });
+$("openDeletedItems").onclick=()=>{ if(lifecycleAction) return; $("deletedItemsDialog").showModal(); refreshDeletedItems(); };
+$("closeDeletedItems").onclick=()=>{ if(lifecycleAction) return; deletedItemsSequence++; deletedItemsLoading=false; $("deletedItemsDialog").close(); };
+$("deletedItemsDialog").addEventListener("cancel",event=>{ event.preventDefault(); $("closeDeletedItems").click(); });
+$("cancelPreparation").onclick=()=>preparationCommand("cancel"); $("resumePreparation").onclick=()=>preparationCommand("resume"); $("resumeRecording").onclick=()=>preparationCommand("resume",true);
 $("browseModel").onclick=browseLocalModel; $("convertModel").onclick=openModelConversion;
 $("closeModelImport").onclick=closeModelImport; $("modelImportDialog").addEventListener("cancel",event=>{ event.preventDefault(); closeModelImport(); });
 $("modelConversionTarget").onchange=()=>{ modelImportError(); updateModelImportDialog(); }; $("modelImportForm").onsubmit=startModelImport;
@@ -1352,7 +1500,7 @@ $("proposalAssist").onchange=()=>{ clearProposals(); updateWorkbenchControls(); 
 $("discardProposals").onclick=()=>{ clearProposals(); updateWorkbenchControls(); draw(); notice(""); };
 document.addEventListener("keydown",event=>{
   if(event.key==="Escape" && drag) { event.preventDefault(); finishDrag(null,true); return; }
-  if($("modelImportDialog").open || $("assistantDialog").open || $("gridEmptyDialog").open || $("emptyDialog").open || $("trainingDialog").open || $("preparationDialog").open || /INPUT|SELECT|TEXTAREA/.test(event.target.tagName)) return;
+  if(document.querySelector("dialog[open]") || /INPUT|SELECT|TEXTAREA/.test(event.target.tagName)) return;
   if(event.code==='Space' && document.activeElement===canvas && image) { event.preventDefault(); spacePan=true; updateCursor(); return; }
   if(drag) return;
   if(gridSize!==1) { if(event.key==="ArrowLeft" || event.key==="ArrowRight") { event.preventDefault(); $(event.key==="ArrowLeft"?"gridPrevious":"gridNext").click(); } return; }
@@ -1367,7 +1515,7 @@ document.addEventListener('keyup',event=>{if(event.code==='Space'){spacePan=fals
 window.addEventListener('blur',()=>{spacePan=false;if(drag) finishDrag(null,true);updateCursor();});
 window.addEventListener("resize",fitGridToViewport);
 window.addEventListener("beforeunload",event=>{ if(dirty) { event.preventDefault(); event.returnValue=""; } });
-setupSidebarGroups(); setTool("select"); showEditingTips(); refreshWorkbench();
+setupSidebarGroups(); setupTrainingData(); setTool("select"); showEditingTips(); refreshWorkbench();
 refreshRecordings().finally(async()=>{ await loadManifest(); refreshEmptyScan(); refreshAssistants(); });
 setInterval(refreshWorkbench,3000);
 setInterval(refreshRecordings,3000);

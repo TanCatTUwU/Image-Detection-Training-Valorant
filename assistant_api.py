@@ -281,6 +281,23 @@ class AssistantHub:
             self.flush(store)
             return dict(connection=self._public(connection))
 
+    def revoke_recording(self, root):
+        root = Path(root).resolve()
+        with self._lock:
+            previous = copy.deepcopy(self._registry)
+            changed = False
+            for connection in self._registry['connections'].values():
+                if Path(connection['root']).resolve() == root and not connection['revoked']:
+                    connection['revoked'] = True
+                    changed = True
+            if changed:
+                try:
+                    self._save()
+                except Exception:
+                    self._registry = previous
+                    raise
+            self._stores.pop(root, None)
+
     def status(self, connection_id, payload=None):
         with self._lock:
             connection = self._connection(connection_id)

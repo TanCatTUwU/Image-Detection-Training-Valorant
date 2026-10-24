@@ -11,6 +11,7 @@ import sys
 import time
 import cv2
 import numpy as np
+from model_registry import atomic_json
 PROJECT = Path(__file__).resolve().parent
 
 def sample_times(start, end, sample_fps, max_images):
@@ -161,9 +162,7 @@ def _reserve_run(parent):
     raise ValueError('Choose another output directory; too many existing recording runs')
 
 def _write_manifest(run, manifest):
-    temporary = run / 'manifest.tmp'
-    temporary.write_text(json.dumps(manifest, indent=2, allow_nan=False), encoding='utf-8')
-    os.replace(temporary, run / 'manifest.json')
+    atomic_json(run / 'manifest.json', manifest)
 
 def _label_text(boxes):
     return ''.join((f"{box['class_id']} {(box['x1'] + box['x2']) / 2:.8f} {(box['y1'] + box['y2']) / 2:.8f} {box['x2'] - box['x1']:.8f} {box['y2'] - box['y1']:.8f}\n" for box in boxes))
@@ -228,7 +227,10 @@ def _restore_run(run, source, settings, times):
     manifest.pop('error', None)
     return manifest
 
-def prepare_video(video_path, output_parent, model_path, *, sample_fps=1, max_images=600, view='focus', val_fraction=0.2, gap_seconds=5, start=0, end=None, device_id=0, confidence=0.25, tiles=True, proposer=None, resume=None, progress_callback=None):
+class PreparationCancelled(Exception):
+    pass
+
+def prepare_video(video_path, output_parent, model_path, *, sample_fps=1, max_images=600, view='focus', val_fraction=0.2, gap_seconds=5, start=0, end=None, device_id=0, confidence=0.25, tiles=True, proposer=None, resume=None, progress_callback=None, cancel_callback=None):
     from directml_backend import detection_view, validate_capture_size
     cv2.setNumThreads(1)
     video_path, model_path = (Path(video_path).resolve(), Path(model_path).resolve())
@@ -274,16 +276,26 @@ def prepare_video(video_path, output_parent, model_path, *, sample_fps=1, max_im
     previous_elapsed = stats.get('elapsed_seconds', 0)
     checkpoint_interval = max(25, math.ceil(len(times) / 1000))
 
-    def report_progress():
+    def report_progress(message=None):
         if progress_callback is not None:
-            progress_callback({'run_path': str(run), 'processed': manifest['next_sample_index'], 'total': len(times), 'saved': stats['saved']})
+            event = {'run_path': str(run), 'processed': manifest['next_sample_index'], 'total': len(times), 'saved': stats['saved']}
+            if message is not None:
+                event['message'] = message
+            progress_callback(event)
+    def check_cancelled():
+        if cancel_callback is not None and cancel_callback():
+            raise PreparationCancelled('Video preparation cancellation requested')
     try:
         report_progress()
-        for item in manifest['frames']:
+        check_cancelled()
+        for checked, item in enumerate(manifest['frames'], 1):
+            check_cancelled()
             existing = cv2.imread(str(run / item['image']))
             if existing is None or existing.shape[:2] != (448, 640):
                 raise ValueError(f"Cannot restore saved image: {item['image']}")
             dedup.accept(existing)
+            if checked == 1 or checked % 25 == 0 or checked == len(manifest['frames']):
+                report_progress(f"Checking saved frames {checked}/{len(manifest['frames'])}")
         if proposer is None:
             from model_inference import create_proposer
             proposer = create_proposer(model_path, device_id, confidence, tiles)
@@ -292,6 +304,7 @@ def prepare_video(video_path, output_parent, model_path, *, sample_fps=1, max_im
         if cursor:
             print(f"Resuming at sample {cursor + 1}/{len(times)}; preserving {len(manifest['frames'])} saved frames.", flush=True)
         for index in range(cursor, len(times)):
+            check_cancelled()
             timestamp = times[index]
             split = temporal_split(timestamp, start, end, val_fraction, gap_seconds)
             if split is None:
@@ -339,7 +352,7 @@ def prepare_video(video_path, output_parent, model_path, *, sample_fps=1, max_im
             raise ValueError('No usable frames were decoded in the selected time range')
         manifest['status'] = 'complete'
     except BaseException as error:
-        manifest['status'] = 'interrupted' if isinstance(error, KeyboardInterrupt) else 'failed'
+        manifest['status'] = 'interrupted' if isinstance(error, (KeyboardInterrupt, PreparationCancelled)) else 'failed'
         manifest['error'] = str(error)
         raise
     finally:

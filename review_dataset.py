@@ -17,6 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 from assistant_api import AssistantConflict, AssistantHub, AssistantUnauthorized, validate_assistant
+from model_registry import replace_file
 PROJECT = Path(__file__).resolve().parent
 MAX_BODY = 1024 * 1024
 FRAME_ID = re.compile('frame-[0-9]{6,12}\\Z')
@@ -71,7 +72,7 @@ def atomic_write(path: Path, data: bytes):
             stream.flush()
             os.fsync(stream.fileno())
             signature = _file_signature(os.fstat(stream.fileno()))
-        os.replace(temporary, path)
+        replace_file(temporary, path)
         return signature
     finally:
         temporary.unlink(missing_ok=True)
@@ -88,6 +89,8 @@ class ReviewStore:
         self.manifest()
 
     def _path(self, relative):
+        if getattr(self, '_retired', False):
+            raise ValueError('This recording was deleted; select or restore a recording')
         if not isinstance(relative, str) or '\\' in relative or ':' in relative:
             raise ValueError('Expected a known relative run path')
         path = (self.root / relative).resolve()
@@ -484,6 +487,7 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
     recordings_lock = threading.Lock()
     stores_lock = threading.Lock()
     assistants_lock = threading.Lock()
+    lifecycle_lock = threading.RLock()
     recording_stores = {store.root: store}
 
     def get_assistants():
@@ -531,6 +535,18 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
         if not isinstance(value, str) or not value or len(value) > 128:
             raise ValueError('Select a known model')
         return value
+
+    def get_actions():
+        from library_actions import LibraryActions
+        board = get_workbench()
+        return LibraryActions(getattr(board, 'project', PROJECT), board, get_recordings(),
+                              proposals=lambda: proposals, assistants=get_assistants,
+                              stores=recording_stores, stores_lock=stores_lock)
+
+    def one_id(payload, key):
+        if set(payload) != {key} or not isinstance(payload.get(key), str) or not payload[key] or len(payload[key]) > 128:
+            raise ValueError(f'Choose one known {key}')
+        return payload[key]
 
     class Handler(BaseHTTPRequestHandler):
         server_version = 'LocalReview'
@@ -608,7 +624,17 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
         def _store(self):
             supplied = self.headers.get_all('X-Review-Run', [])
             if not supplied:
-                return store
+                if not getattr(store, '_retired', False):
+                    return store
+                entries = get_recordings().snapshot().get('recordings', [])
+                selected = next((entry for entry in entries if entry.get('status') == 'complete'), None)
+                if selected is None:
+                    return EmptyReviewStore(getattr(get_workbench(), 'project', PROJECT))
+                root = Path(get_recordings().resolve(selected['id'])).resolve()
+                with stores_lock:
+                    if root not in recording_stores:
+                        recording_stores[root] = ReviewStore(root)
+                    return recording_stores[root]
             if len(supplied) != 1 or not re.fullmatch('run-[a-f0-9]{16,64}', supplied[0]):
                 raise ValueError('Choose one known recording ID')
             root = Path(get_recordings().resolve(supplied[0])).resolve()
@@ -658,6 +684,8 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                     return self._send(200, get_assistants().image_path(self._assistant_connection, assistant_image[1]).read_bytes(), 'image/png')
                 if route == '/api/recordings':
                     return self._send(200, get_recordings().snapshot())
+                if route == '/api/deleted-items':
+                    return self._send(200, get_actions().deleted_items())
                 if route == '/api/workbench':
                     return self._send(200, get_workbench().snapshot())
                 download = re.fullmatch(r'/api/models/([a-z0-9-]+)/download/(onnx|pt)', route)
@@ -686,6 +714,21 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                 self._error(500, str(exc))
 
         def do_POST(self):
+            serialized = {'/api/models/delete', '/api/recordings/delete', '/api/deleted-items/restore',
+                          '/api/recordings/prepare', '/api/recordings/cancel', '/api/recordings/resume',
+                          '/api/training/start', '/api/models/import', '/api/models/convert',
+                          '/api/models/select', '/api/directml/run', '/api/empty-scan/start',
+                          '/api/assistants/connect'}
+            try:
+                path = urlsplit(self.path).path
+            except ValueError:
+                return self._post()
+            if path in serialized or re.fullmatch(r'/api/frame/frame-[0-9]{6,12}/propose', path):
+                with lifecycle_lock:
+                    return self._post()
+            return self._post()
+
+        def _post(self):
             try:
                 route, _ = self._route()
                 if route is None:
@@ -716,6 +759,18 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                     return self._send(200, get_recordings().browse())
                 if route == '/api/recordings/prepare':
                     return self._send(200, get_recordings().start_preparation(payload))
+                if route == '/api/recordings/cancel':
+                    one_id(payload, 'job_id')
+                    return self._send(200, get_recordings().cancel_preparation(payload))
+                if route == '/api/recordings/resume':
+                    one_id(payload, 'job_id')
+                    return self._send(200, get_recordings().resume_preparation(payload))
+                if route == '/api/recordings/delete':
+                    return self._send(200, get_actions().delete_recording(one_id(payload, 'recording_id')))
+                if route == '/api/models/delete':
+                    return self._send(200, get_actions().delete_model(one_id(payload, 'model_id')))
+                if route == '/api/deleted-items/restore':
+                    return self._send(200, get_actions().restore(one_id(payload, 'trash_id')))
                 if route == '/api/empty-scan/start':
                     return self._send(200, get_empty_scans().start(payload, self._store()))
                 if route == '/api/empty-scan/cancel':

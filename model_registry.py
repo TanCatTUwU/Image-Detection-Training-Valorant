@@ -21,6 +21,16 @@ def _sha256(path):
             digest.update(chunk)
     return digest.hexdigest()
 
+def replace_file(source, destination):
+    for attempt in range(8):
+        try:
+            os.replace(source, destination)
+            return
+        except OSError as error:
+            if getattr(error, 'winerror', None) not in (5, 32, 33) or attempt == 7:
+                raise
+            time.sleep(min(0.025 * 2 ** attempt, 0.4))
+
 def atomic_json(path, value):
     path = Path(path)
     temporary = path.with_name(f'write-{secrets.token_hex(8)}.tmp')
@@ -30,7 +40,7 @@ def atomic_json(path, value):
             stream.write('\n')
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(temporary, path)
+        replace_file(temporary, path)
     finally:
         temporary.unlink(missing_ok=True)
 
@@ -187,7 +197,54 @@ class ModelRegistry:
         active_id = self._active_id(entries)
         keys = ('id', 'label', 'path', 'view', 'input_shape', 'created_at')
         return [{**{key: entry[key] for key in keys}, 'is_active': entry['id'] == active_id,
+                 'can_delete': not entry['id'].startswith('builtin-') and entry['id'] != active_id,
+                 'delete_reason': 'Included models cannot be deleted' if entry['id'].startswith('builtin-') else ('Switch the active default model before deleting it' if entry['id'] == active_id else None),
                  'formats': self._formats(entry)} for entry in entries]
+
+    def delete(self, model_id):
+        from local_trash import LocalTrash
+        self._prepare()
+        with file_lock(self.root / 'registry.lock'):
+            entry = self.resolve(model_id)
+            if not entry['can_delete']:
+                raise ValueError(entry['delete_reason'])
+            manifest = read_json(self.root / 'models.json')
+            if not isinstance(manifest, dict) or not isinstance(manifest.get('models'), list):
+                raise ValueError('Model library metadata is damaged; existing models were preserved')
+            original = next((item for item in manifest['models'] if item.get('id') == model_id), None)
+            if original is None:
+                raise ValueError('Unknown managed model')
+            trash = LocalTrash(self.project)
+            record = trash.put('model', self.root / model_id, entry['label'], model_id=model_id, model_entry=original)
+            try:
+                atomic_json(self.root / 'models.json', {**manifest, 'models': [item for item in manifest['models'] if item.get('id') != model_id]})
+            except BaseException:
+                trash.restore(record['id'], kind='model')
+                raise
+            return dict(deleted=True, trash_id=record['id'], model_id=model_id)
+
+    def restore(self, trash_id):
+        from local_trash import LocalTrash
+        self._prepare()
+        with file_lock(self.root / 'registry.lock'):
+            def commit(record, path):
+                manifest = read_json(self.root / 'models.json', {'models': []})
+                if not isinstance(manifest, dict) or not isinstance(manifest.get('models'), list):
+                    raise ValueError('Model library metadata is damaged; the deleted item was preserved')
+                original = record.get('model_entry')
+                if not isinstance(original, dict) or original.get('id') != record['model_id']:
+                    raise ValueError('The deleted model metadata is invalid')
+                if any(item.get('id') == original['id'] and item != original for item in manifest['models']):
+                    raise ValueError('This model ID already exists with different metadata')
+                restored = {**manifest, 'models': [item for item in manifest['models'] if item.get('id') != original['id']] + [original]}
+                entry = {**original, 'path': str(path / 'model.onnx')}
+                self.validator(Path(entry['path']))
+                if _sha256(entry['path']) != original.get('sha256'):
+                    raise ValueError('The deleted model content changed')
+                atomic_json(self.root / 'models.json', restored)
+                return entry
+            result = LocalTrash(self.project).restore(trash_id, kind='model', commit=commit)
+            return self.resolve(result['id'])
 
     def _artifact_path(self, entry, format):
         if format not in ('onnx', 'pt'):
