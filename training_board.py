@@ -16,7 +16,7 @@ from training_metrics import TrainingMetrics, valid_epoch
 PROJECT = Path(__file__).resolve().parent
 ACTIVE_STATES = {'queued', 'running', 'exporting'}
 DEFAULTS = dict(epochs=30, batch=4, imgsz=320, model_width=320, model_height=320,
-                workers=0, threads=2, device='cpu', name='train-head-body', auto_activate=True,
+                workers=0, threads=2, device='auto', name='train-head-body', auto_activate=True,
                 mosaic=0.3, mixup=0, degrees=0, fliplr=0.5, patience=10, background_ratio=0.25)
 RESERVED = {'con', 'prn', 'aux', 'nul', 'clock$', 'conin$', 'conout$'}
 RESERVED.update((f'{prefix}{number}' for prefix in ('com', 'lpt') for number in '123456789¹²³'))
@@ -43,7 +43,9 @@ def validate_options(payload, registry):
         raise ValueError('background_ratio must be a finite number from 0 to 1')
     if any(options[key] % 32 for key in ('imgsz', 'model_width', 'model_height')):
         raise ValueError('Image size, model width and model height must be multiples of 32')
-    if options['device'] != 'cpu':
+    if not isinstance(options['device'], str) or not re.fullmatch(r'auto|cpu|cuda:\d+', options['device']):
+        raise ValueError('Training device must be Auto, CPU, or an available NVIDIA GPU')
+    if options['device'] not in ('auto', 'cpu'):
         from model_inference import hardware
         available = hardware().get('device')
         if not available or not available.startswith('cuda:') or options['device'] != available:
@@ -66,7 +68,7 @@ def prepared_environment(project, threads=2):
     return env
 
 def _public_job(job, project=None, metrics=None):
-    keys = ('id', 'state', 'epoch', 'epochs', 'progress', 'message', 'model_id', 'run_path')
+    keys = ('id', 'state', 'epoch', 'epochs', 'progress', 'message', 'model_id', 'run_path', 'resolved_device')
     result = {key: job.get(key) for key in keys}
     project = Path(project or job['project'])
     metrics = metrics or TrainingMetrics(project)
@@ -133,7 +135,10 @@ class TrainingBoard:
         models = self.registry.list_models()
         from model_inference import choose_inference
         capabilities = self.hardware.snapshot()
-        devices = [{'id': 'cpu', 'label': 'CPU · local fine-tuning'}]
+        available = capabilities.get('device') if capabilities else None
+        automatic = 'Checking hardware…' if capabilities is None else capabilities.get('label') if str(available).startswith('cuda:') else 'CPU fallback · NVIDIA CUDA unavailable'
+        devices = [{'id': 'auto', 'label': 'Auto · ' + (automatic or 'NVIDIA CUDA GPU')},
+                   {'id': 'cpu', 'label': 'CPU · local fine-tuning'}]
         if capabilities and str(capabilities.get('device', '')).startswith('cuda:'):
             devices.append({'id': capabilities['device'], 'label': capabilities['label']})
         for model in models:
@@ -239,7 +244,7 @@ def _train(job, update):
             result['run_path'] = event['run_path']
         if 'checkpoint' in event:
             result['checkpoint'] = event['checkpoint']
-        fields = {key: event[key] for key in ('epoch', 'run_path', 'message', 'stopped_early', 'best_epoch') if key in event}
+        fields = {key: event[key] for key in ('epoch', 'run_path', 'message', 'stopped_early', 'best_epoch', 'resolved_device') if key in event}
         if 'epoch' in fields:
             fields['progress'] = min(90, 90 * fields['epoch'] / options['epochs'])
         update(**fields)
@@ -295,7 +300,7 @@ def run_training_job(manifest, *, registry=None, trainer=None, exporter=None, va
                         update(options=options)
                         os.environ.update({key: value for key, value in prepared_environment(project, job['options']['threads']).items() if key != 'PATH'})
                         update(state='running', worker_pid=os.getpid(), message='Fine-tuning the reviewed dataset')
-                        print(f"Job {job['id']}: CPU training, {job['epochs']} epochs; log: {log_path}", flush=True)
+                        print(f"Job {job['id']}: requested device {options['device']}, {job['epochs']} epochs; log: {log_path}", flush=True)
                         checkpoint = Path((trainer or _train)(job, update)).resolve()
                         if not checkpoint.is_file() or checkpoint.suffix != '.pt':
                             raise ValueError('Training did not produce a best checkpoint')

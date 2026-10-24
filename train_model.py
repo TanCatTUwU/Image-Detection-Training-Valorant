@@ -116,16 +116,21 @@ def audit_dataset(data_path: Path) -> DatasetAudit:
     return report
 
 def choose_device(requested: str, torch_module) -> str:
+    if not isinstance(requested, str) or not re.fullmatch(r'auto|cpu|cuda(?::\d+)?', requested):
+        raise ValueError('Training device must be cpu, auto, cuda, or cuda:N')
     if requested == 'cpu':
         return 'cpu'
-    if not torch_module.cuda.is_available():
-        raise ValueError('CUDA is unavailable. CPU training is slow; explicitly use --device cpu to start it. DirectML inference does not provide Ultralytics training.')
-    if requested == 'auto' or requested == 'cuda':
-        return '0'
-    match = re.fullmatch('cuda:(\\d+)', requested)
-    if not match or int(match[1]) >= torch_module.cuda.device_count():
-        raise ValueError(f'Unsupported training device: {requested}; use cpu, auto, cuda, or cuda:N')
-    return str(int(match[1]))
+    index = int(requested.split(':')[1]) if ':' in requested else 0
+    try:
+        if not torch_module.cuda.is_available() or index >= torch_module.cuda.device_count():
+            raise RuntimeError('The selected NVIDIA CUDA GPU is unavailable')
+        if float(torch_module.ones(1, device=f'cuda:{index}').add(1).cpu()[0]) != 2:
+            raise RuntimeError('The NVIDIA GPU did not pass its operation check')
+    except (OSError, RuntimeError, AssertionError) as exc:
+        if requested == 'auto':
+            return 'cpu'
+        raise ValueError(f'CUDA training is unavailable: {exc}. Select Auto or CPU, or run setup.bat again.') from exc
+    return str(index)
 
 def validate_run_name(name: str) -> None:
     if not re.fullmatch('[a-z0-9][a-z0-9_-]{0,63}', name) or name.split('.')[0].lower() in RESERVED:
@@ -167,7 +172,7 @@ def parse_args(argv=None):
     parser.add_argument('--weights', default=str(PROJECT / 'best.pt'), help='Existing local .pt checkpoint')
     parser.add_argument('--check-data', action='store_true', help='Audit data only; no Torch import or output files')
     parser.add_argument('--dry-run', action='store_true', help='Audit data and show a plan; no training or Torch import')
-    parser.add_argument('--device', default='auto', help='auto selects CUDA only; cpu requires explicit selection')
+    parser.add_argument('--device', default='auto', help='auto uses a working NVIDIA CUDA GPU, otherwise CPU')
     parser.add_argument('--epochs', type=positive, default=30)
     parser.add_argument('--batch', type=positive, default=4)
     parser.add_argument('--imgsz', type=positive, default=320)
@@ -231,9 +236,12 @@ def main(argv=None, *, progress_callback=None) -> int:
         run = reserve_run_directory(output_parent, args.name)
         resolved_yaml = run / 'dataset-resolved.yaml'
         resolved_yaml.write_text(yaml.safe_dump({'path': str(report.root), 'train': [str(path) for path in report.split_dirs['train']], 'val': [str(path) for path in report.split_dirs['val']], 'names': {0: 'Head', 1: 'Body'}}, sort_keys=False), encoding='utf-8')
-        print(f'Training on {device}; new candidate run: {run}')
+        device_label = 'CPU' if device == 'cpu' else f'NVIDIA {torch.cuda.get_device_name(int(device))} · CUDA {device}'
+        if device == 'cpu' and args.device == 'auto':
+            device_label += ' · automatic fallback'
+        print(f'Training on {device_label}; new candidate run: {run}')
         if progress_callback:
-            progress_callback({'run_path': str(run), 'message': f'Training on {device}'})
+            progress_callback({'run_path': str(run), 'message': f'Training on {device_label}', 'resolved_device': device})
         model = YOLO(str(weights), task='detect')
         observed_epoch = None
         best_epoch = None

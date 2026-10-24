@@ -1176,12 +1176,12 @@ function updateWorkbenchControls() {
   updateEmptyScanControls();
 }
 function setupTrainingForm(options) {
-  const defaults={epochs:30,batch:4,model_width:320,model_height:320,workers:0,threads:2,device:"cpu",name:"train-head-body",auto_activate:true,mosaic:.3,mixup:0,degrees:0,fliplr:.5,patience:10,background_ratio:.25,...options.defaults};
+  const defaults={epochs:30,batch:4,model_width:320,model_height:320,workers:0,threads:2,device:"auto",name:"train-head-body",auto_activate:true,mosaic:.3,mixup:0,degrees:0,fliplr:.5,patience:10,background_ratio:.25,...options.defaults};
   if(!trainingFormReady) {
     for(const [id,key] of [["trainEpochs","epochs"],["trainBatch","batch"],["trainModelWidth","model_width"],["trainModelHeight","model_height"],["trainWorkers","workers"],["trainThreads","threads"],["trainName","name"],["trainMosaic","mosaic"],["trainMixup","mixup"],["trainDegrees","degrees"],["trainFliplr","fliplr"],["trainPatience","patience"],["trainBackgroundRatio","background_ratio"]]) $(id).value=defaults[key];
     $("trainAutoActivate").checked=defaults.auto_activate!==false;
   }
-  for(const [id,items,preferred] of [["trainDevice",options.devices||[{id:"cpu",label:"CPU"}],defaults.device],["trainCheckpoint",options.checkpoints||[],defaults.checkpoint_id]]) {
+  for(const [id,items,preferred] of [["trainDevice",options.devices||[{id:"auto",label:"Auto · NVIDIA GPU or CPU"},{id:"cpu",label:"CPU"}],defaults.device],["trainCheckpoint",options.checkpoints||[],defaults.checkpoint_id]]) {
     const control=$(id), previous=trainingFormReady?control.value:preferred;
     const choices=items.map(item=>({id:String(item.id),label:String(item.label)}));
     const existing=[...control.options].map(option=>({id:option.value,label:option.textContent}));
@@ -1218,7 +1218,8 @@ function renderWorkbench() {
   if(job) {
     $("trainingStatus").classList.toggle("failed",["failed","interrupted"].includes(job.state));
     const epoch=Number.isFinite(job.epoch)&&Number.isFinite(job.epochs)?` · epoch ${job.epoch} / ${job.epochs}`:"";
-    $("jobTitle").textContent=`Training ${job.state}${epoch}`;
+    const device=job.resolved_device==="cpu"?" · CPU":/^\d+$/.test(String(job.resolved_device??""))?` · CUDA ${job.resolved_device}`:"";
+    $("jobTitle").textContent=`Training ${job.state}${epoch}${device}`;
     $("jobMessage").textContent=job.message || (job.state==="completed"?"Model export completed.":"Waiting for training progress…");
     const progress=Math.min(100,Math.max(0,Number(job.progress)||0)); $("jobProgress").style.width=`${progress}%`;
     const terminal=["completed","failed","interrupted"].includes(job.state);

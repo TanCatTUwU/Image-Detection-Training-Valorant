@@ -10,7 +10,7 @@ if errorlevel 1 (
     echo Python 3.12 64-bit is required.
     exit /b 1
 )
-"runtime-env\Scripts\python.exe" -m pip install "torch==2.14.1+cpu" "torchvision==0.29.1+cpu" --index-url https://download.pytorch.org/whl/cpu
+"runtime-env\Scripts\python.exe" setup_runtime.py
 if errorlevel 1 exit /b 1
 "runtime-env\Scripts\python.exe" -m pip install -r requirements.txt
 if errorlevel 1 exit /b 1

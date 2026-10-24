@@ -14,8 +14,8 @@ def hardware():
         import torch
         device = 'cuda:0' if torch.cuda.is_available() else 'mps' if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available() else None
         if device:
-            probe = torch.ones(1, device=device)
-            if float(probe.cpu()[0]) == 1:
+            probe = torch.ones(1, device=device).add(1)
+            if float(probe.cpu()[0]) == 2:
                 result.update(device=device, label='Ultralytics · ' + (torch.cuda.get_device_name(0) if device == 'cuda:0' else 'Apple GPU'))
     except (ImportError, OSError, RuntimeError, AssertionError):
         pass
