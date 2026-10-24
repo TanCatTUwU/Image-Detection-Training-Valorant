@@ -17,7 +17,7 @@ PROJECT = Path(__file__).resolve().parent
 ACTIVE_STATES = {'queued', 'running', 'exporting'}
 DEFAULTS = dict(epochs=30, batch=4, imgsz=320, model_width=320, model_height=320,
                 workers=0, threads=2, device='cpu', name='train-head-body', auto_activate=True,
-                mosaic=0.3, mixup=0, degrees=0, fliplr=0.5, patience=10)
+                mosaic=0.3, mixup=0, degrees=0, fliplr=0.5, patience=10, background_ratio=0.25)
 RESERVED = {'con', 'prn', 'aux', 'nul', 'clock$', 'conin$', 'conout$'}
 RESERVED.update((f'{prefix}{number}' for prefix in ('com', 'lpt') for number in '123456789¹²³'))
 
@@ -38,6 +38,9 @@ def validate_options(payload, registry):
             raise ValueError(f'{key} must be an integer from {lower} to {upper}')
     from train_model import validate_augmentation_options
     validate_augmentation_options(options)
+    background_ratio = options['background_ratio']
+    if type(background_ratio) not in (int, float) or not 0 <= background_ratio <= 1:
+        raise ValueError('background_ratio must be a finite number from 0 to 1')
     if any(options[key] % 32 for key in ('imgsz', 'model_width', 'model_height')):
         raise ValueError('Image size, model width and model height must be multiples of 32')
     if options['device'] != 'cpu':

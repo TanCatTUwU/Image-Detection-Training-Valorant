@@ -135,6 +135,13 @@ class ReviewStore:
     def manifest(self):
         return self._manifest_snapshot()
 
+    def frame_context(self, frame_id):
+        with self._thread_lock:
+            data = self._manifest_snapshot(clone=False)
+            self._complete(data)
+            frame = self._frame(data, frame_id)
+            return {**copy.deepcopy({key: data.get(key, {}) for key in ('schema_version', 'status', 'source', 'settings')}), 'frames': [copy.deepcopy(frame)]}
+
     def _manifest_snapshot(self, *, clone=True):
         with self._thread_lock:
             path = self._path('manifest.json')
@@ -364,7 +371,7 @@ class ReviewStore:
         if type(revision) is not int or revision < 0 or (not isinstance(evidence, dict)):
             raise ValueError('An integer revision and strict empty-scan evidence are required')
         confidence = evidence.get('confidence')
-        if evidence.get('decision') != 'empty' or evidence.get('method') != 'strict-onnx-multiview-v1' or type(evidence.get('detections')) is not int or (evidence['detections'] != 0) or (type(evidence.get('temporal_frames')) is not int) or (evidence['temporal_frames'] != 2) or (type(evidence.get('passes')) is not int) or (not 3 <= evidence['passes'] <= 10000) or (type(confidence) not in (int, float)) or (not math.isfinite(confidence)) or (not 0 < confidence <= 0.1) or (not isinstance(evidence.get('model_id'), str)) or (not 1 <= len(evidence['model_id']) <= 128) or (not isinstance(evidence.get('model_sha256'), str)) or (not re.fullmatch('[a-f0-9]{64}', evidence['model_sha256'])) or (not isinstance(evidence.get('checked_at'), str)) or (not 1 <= len(evidence['checked_at']) <= 128):
+        if evidence.get('decision') != 'empty' or evidence.get('method') != 'strict-onnx-multiview-v1' or type(evidence.get('detections')) is not int or (evidence['detections'] != 0) or (type(evidence.get('temporal_frames')) is not int) or (evidence['temporal_frames'] != 2) or (type(evidence.get('passes')) is not int) or (not 3 <= evidence['passes'] <= 10000) or (type(confidence) not in (int, float)) or (not .05 <= confidence <= .95) or (not math.isfinite(confidence)) or (not isinstance(evidence.get('model_id'), str)) or (not 1 <= len(evidence['model_id']) <= 128) or (not isinstance(evidence.get('model_sha256'), str)) or (not re.fullmatch('[a-f0-9]{64}', evidence['model_sha256'])) or (not isinstance(evidence.get('checked_at'), str)) or (not 1 <= len(evidence['checked_at']) <= 128):
             raise ValueError('Strict multi-view and temporal empty-scan evidence is required')
         clean = {key: evidence[key] for key in ('decision', 'method', 'model_id', 'model_sha256', 'confidence', 'detections', 'temporal_frames', 'passes', 'checked_at')}
         with self._locked():
@@ -648,6 +655,12 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
             if 'recording_ids' not in options:
                 if 'validation_recording_ids' in options:
                     raise ValueError('Select training recordings before choosing a validation holdout')
+                if options.get('background_ratio', 0):
+                    from training_dataset import export_recordings
+                    from recording_library import recording_id
+                    current = self._store()
+                    board = get_workbench()
+                    return board.start_training(options, lambda: export_recordings(getattr(board, 'project', PROJECT), [(recording_id(current.root), current)], background_ratio=options['background_ratio']))
                 return get_workbench().start_training(options, self._store().export_reviewed)
             from training_dataset import export_recordings, validate_recording_selection
             selected = options.pop('recording_ids')
@@ -662,7 +675,7 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                         recording_stores[root] = ReviewStore(root)
                     sources.append((rid, recording_stores[root]))
             board = get_workbench()
-            return board.start_training(options, lambda: export_recordings(getattr(board, 'project', PROJECT), sources, validation))
+            return board.start_training(options, lambda: export_recordings(getattr(board, 'project', PROJECT), sources, validation, background_ratio=options.get('background_ratio', 0.25)))
 
         def do_GET(self):
             try:

@@ -9,6 +9,12 @@ import secrets
 import shutil
 
 RECORDING_ID = re.compile(r'run-[a-f0-9]{16,64}\Z')
+BACKGROUND_REGIONS = tuple((x, y, x + 256, y + 256) for x, y in
+                          ((0, 0), (384, 0), (0, 192), (384, 192), (192, 0), (192, 192), (0, 96), (384, 96)))
+
+
+def _pixel_key(image):
+    return image.size, hashlib.sha256(image.tobytes()).digest()
 
 
 def validate_recording_selection(recording_ids, validation_ids=()):
@@ -26,8 +32,10 @@ def validate_recording_selection(recording_ids, validation_ids=()):
         raise ValueError('Keep at least one training recording outside the validation holdout')
 
 
-def export_recordings(project, stores, validation_ids=()):
+def export_recordings(project, stores, validation_ids=(), *, background_ratio=0):
     from review_dataset import yolo_text
+    if type(background_ratio) not in (int, float) or not 0 <= background_ratio <= 1 or not math.isfinite(background_ratio):
+        raise ValueError('background_ratio must be a finite number from 0 to 1')
     project = Path(project).resolve(strict=True)
     ids = [rid for rid, _ in stores]
     validate_recording_selection(ids, validation_ids)
@@ -95,7 +103,9 @@ def export_recordings(project, stores, validation_ids=()):
         raise ValueError('Could not reserve a unique training export')
     counts = dict(train=0, val=0)
     negatives = dict(train=0, val=0)
+    background_crops = dict(train=0, val=0)
     digests, report, skipped = {}, [], 0
+    pixel_digests, crop_sources = {}, []
     try:
         for split in ('train', 'val'):
             (destination / 'images' / split).mkdir(parents=True)
@@ -103,6 +113,8 @@ def export_recordings(project, stores, validation_ids=()):
         for rid, store, frames, role in sources:
             exported = dict(train=0, val=0)
             provenance = []
+            recording_report = dict(id=rid, path=str(store.root), role=role or 'saved', exported=exported,
+                                    frames=provenance, background_crops=dict(train=0, val=0), crops=[])
             for frame in frames:
                 split = role or frame['split']
                 name = f"{rid}-{frame['id']}"
@@ -128,20 +140,77 @@ def export_recordings(project, stores, validation_ids=()):
                     target.unlink()
                     skipped += 1
                     continue
+                if background_ratio:
+                    from PIL import Image
+                    with Image.open(target) as copied:
+                        pixel_key = _pixel_key(copied.convert('RGB'))
+                    if pixel_key in pixel_digests:
+                        previous_split, previous_text = pixel_digests[pixel_key]
+                        if previous_split != split:
+                            raise ValueError('Duplicate image content in both train and val; remove overlapping footage from the selection')
+                        if previous_text != text:
+                            raise ValueError('Identical frames have conflicting approved labels; correct them before training')
+                        target.unlink()
+                        skipped += 1
+                        continue
+                    pixel_digests[pixel_key] = split, text
                 digests[key] = split, text
                 (destination / 'labels' / split / f'{name}.txt').write_text(text, encoding='utf-8', newline='\n')
                 counts[split] += 1
                 negatives[split] += int(not frame['boxes'])
                 exported[split] += 1
                 provenance.append(dict(id=frame['id'], revision=frame['revision'], split=split))
-            report.append(dict(id=rid, path=str(store.root), role=role or 'saved', exported=exported, frames=provenance))
+                if background_ratio and frame['boxes']:
+                    crop_sources.append((rid, frame, split, target, recording_report))
+            report.append(recording_report)
         if not all(counts.values()):
             raise ValueError('The combined dataset needs unique approved images in both train and val')
+        if background_ratio:
+            from PIL import Image, ImageStat
+            remaining = {split: max(0, math.ceil((counts[split] - negatives[split]) * background_ratio) - negatives[split])
+                         for split in ('train', 'val')}
+            crop_sources.sort(key=lambda item: (item[2] == 'val', hashlib.sha256(f"{item[0]}/{item[1]['id']}".encode()).digest()))
+            for rid, frame, split, copied_path, recording_report in crop_sources:
+                if not remaining[split]:
+                    continue
+                with Image.open(copied_path) as copied:
+                    if copied.size != (640, 448):
+                        continue
+                    image = copied.convert('RGB')
+                offset = hashlib.sha256(f"{rid}/{frame['id']}".encode()).digest()[0] % len(BACKGROUND_REGIONS)
+                for region in BACKGROUND_REGIONS[offset:] + BACKGROUND_REGIONS[:offset]:
+                    left, top, right, bottom = region
+                    if any(left < box['x2'] * 640 + 32 and right > box['x1'] * 640 - 32
+                           and top < box['y2'] * 448 + 32 and bottom > box['y1'] * 448 - 32
+                           for box in frame['boxes']):
+                        continue
+                    crop = image.crop(region)
+                    if max(ImageStat.Stat(crop).stddev) < 3:
+                        continue
+                    pixel_key = _pixel_key(crop)
+                    if pixel_key in pixel_digests:
+                        continue
+                    name = f"bg-{rid}-{frame['id']}"
+                    target = destination / 'images' / split / f'{name}.png'
+                    with target.open('xb') as outgoing:
+                        crop.save(outgoing, format='PNG')
+                    (destination / 'labels' / split / f'{name}.txt').write_text('', encoding='utf-8')
+                    pixel_digests[pixel_key] = split, ''
+                    counts[split] += 1
+                    negatives[split] += 1
+                    background_crops[split] += 1
+                    remaining[split] -= 1
+                    recording_report['exported'][split] += 1
+                    recording_report['background_crops'][split] += 1
+                    recording_report['crops'].append(dict(name=name, source_frame_id=frame['id'],
+                                                           source_revision=frame['revision'], region=list(region), split=split))
+                    break
         (destination / 'dataset.yaml').write_text('path: .\ntrain: images/train\nval: images/val\nnames:\n  0: Head\n  1: Body\n', encoding='utf-8', newline='\n')
         result = dict(path=str(destination), **counts, backgrounds=negatives, duplicates_skipped=skipped,
+                      background_crops=background_crops, background_ratio=background_ratio,
                       split_mode='recording' if holdout else 'saved', recordings=report)
         (destination / 'review-report.json').write_text(json.dumps(result, indent=2, ensure_ascii=False, allow_nan=False) + '\n', encoding='utf-8')
-        return {**result, 'recordings': [{key: value for key, value in item.items() if key != 'frames'} for item in report]}
+        return {**result, 'recordings': [{key: value for key, value in item.items() if key not in ('frames', 'crops')} for item in report]}
     except BaseException:
         if destination.is_relative_to(parent) and not destination.is_symlink():
             shutil.rmtree(destination)

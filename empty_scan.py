@@ -2,6 +2,8 @@ from __future__ import annotations
 import argparse
 import contextlib
 import hashlib
+import json
+import math
 import os
 import re
 import secrets
@@ -14,6 +16,7 @@ from pathlib import Path
 from model_registry import ModelRegistry, atomic_json, file_lock, process_alive, read_json, utc_now
 PROJECT = Path(__file__).resolve().parent
 JOB_ID = re.compile('empty-[a-f0-9]{16}\\Z')
+FRAME_ID = re.compile('frame-[0-9]{6,12}\\Z')
 ACTIVE = {'queued', 'running'}
 CONFIDENCE = 0.08
 
@@ -23,11 +26,29 @@ def _run_key(root):
 def _candidate(frame):
     return frame.get('status') == 'pending' and frame.get('boxes') == [] and (type(frame.get('revision')) is int) and (frame['revision'] == 0)
 
+def _load_candidates(job, folder):
+    if 'candidate_file' in job:
+        path = folder / 'candidates.json'
+        if job['candidate_file'] != 'candidates.json' or path.is_symlink() or path.resolve().parent != folder:
+            raise ValueError('Empty scan candidates must use the managed candidates.json file')
+        candidates = read_json(path)
+    else:
+        candidates = job.get('candidates')
+    if type(job.get('total')) is not int or job['total'] < 1 or not isinstance(candidates, list) or len(candidates) != job['total']:
+        raise ValueError('Invalid empty scan candidate count')
+    seen = set()
+    for candidate in candidates:
+        if not isinstance(candidate, dict) or not isinstance(candidate.get('id'), str) or not FRAME_ID.fullmatch(candidate['id']) or type(candidate.get('revision')) is not int or candidate['revision'] != 0 or candidate['id'] in seen:
+            raise ValueError('Empty scan candidates must be unique untouched frame IDs with revision zero')
+        seen.add(candidate['id'])
+    return candidates
+
 def _expired(job):
     return job.get('state') == 'queued' and (not job.get('worker_pid')) and ((datetime.now(timezone.utc) - datetime.fromisoformat(job['created_at'])).total_seconds() > 45)
 
 def _public(job, folder):
-    result = {key: job.get(key) for key in ('id', 'state', 'model_id', 'model_label', 'total', 'processed', 'removed', 'kept', 'skipped', 'message')}
+    result = {key: job.get(key) for key in ('id', 'state', 'model_id', 'model_label', 'inference_backend', 'inference_device', 'runtime_label', 'confidence', 'reason_counts', 'total', 'processed', 'removed', 'kept', 'skipped', 'message')}
+    result['confidence'] = job.get('confidence', CONFIDENCE)
     result['log_tail'] = ''
     for name in ('scan.log', 'bootstrap.log'):
         try:
@@ -85,8 +106,11 @@ class EmptyScanManager:
         return _public(job, folder)
 
     def start(self, payload, store):
-        if not isinstance(payload, dict) or set(payload) != {'model_id'} or (not isinstance(payload['model_id'], str)):
+        if not isinstance(payload, dict) or set(payload) - {'model_id', 'confidence'} or not isinstance(payload.get('model_id'), str):
             raise ValueError('Choose one known model for the empty scan')
+        confidence = payload.get('confidence', CONFIDENCE)
+        if type(confidence) not in (int, float) or not .05 <= confidence <= .95 or not math.isfinite(confidence):
+            raise ValueError('Scan confidence must be a finite number from 0.05 to 0.95')
         chosen = self.registry.resolve(payload['model_id'])
         model = self.registry.for_view(chosen['id'], 'focus') or self.registry.for_view(chosen['id'], 'full') or chosen
         model = self.registry.validate(model['id'])
@@ -118,8 +142,9 @@ class EmptyScanManager:
                     continue
             else:
                 raise ValueError('Could not reserve an empty scan job')
-            job = dict(id=job_id, project=str(self.project), run_path=str(Path(store.root).resolve()), state='queued', model_id=model['id'], model_label=model['label'], model_path=model['path'], model_sha256=fingerprint, candidates=candidates, total=len(candidates), processed=0, removed=0, kept=0, skipped=0, message='Starting strict model screening', created_at=utc_now(), updated_at=utc_now())
+            job = dict(id=job_id, project=str(self.project), run_path=str(Path(store.root).resolve()), state='queued', model_id=model['id'], model_label=model['label'], model_path=model['path'], model_sha256=fingerprint, confidence=confidence, reason_counts={}, candidate_file='candidates.json', total=len(candidates), processed=0, removed=0, kept=0, skipped=0, message='Starting model screening', created_at=utc_now(), updated_at=utc_now())
             manifest = folder / 'job.json'
+            atomic_json(folder / 'candidates.json', candidates)
             atomic_json(manifest, job)
             runs = read_json(self.root / 'runs.json', {})
             if not isinstance(runs, dict):
@@ -128,7 +153,7 @@ class EmptyScanManager:
             atomic_json(self.root / 'runs.json', runs)
             atomic_json(self.root / 'active.json', {'id': job_id})
             try:
-                flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0) | getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0)
+                flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0) | getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0) | getattr(subprocess, 'BELOW_NORMAL_PRIORITY_CLASS', 0)
                 env = dict(os.environ, PYTHONUNBUFFERED='1', PYTHONUTF8='1', YOLO_OFFLINE='true', YOLO_AUTOINSTALL='false', OMP_NUM_THREADS='1', MKL_NUM_THREADS='1')
                 with (folder / 'bootstrap.log').open('ab') as log:
                     process = self.launcher([str(self.python), '-u', str(PROJECT / 'empty_scan.py'), '--worker', str(manifest)], cwd=str(self.project), env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, close_fds=True, creationflags=flags)
@@ -203,9 +228,18 @@ def _mapped(box, region, flipped):
 
 def _scan_pixels(proposer, pixels, *, dense, flipped, cancelled):
     passes = 0
+    contains_targets = getattr(proposer, 'contains_targets', None)
     for crop, region, flip in _views(pixels, dense=dense, flipped=flipped):
         if cancelled():
             raise ScanCancelled()
+        if callable(contains_targets):
+            found = contains_targets(crop)
+            passes += 1
+            if type(found) is not bool:
+                raise ValueError('The detector returned invalid empty-screening evidence')
+            if found:
+                return (True, passes)
+            continue
         detections = proposer._pass(crop)
         passes += 1
         if not isinstance(detections, list):
@@ -222,19 +256,23 @@ def verify_empty(proposer, pixels, data, frame, *, neighbor_loader=None, cancell
     reason = _quality_reason(pixels)
     if reason:
         return ('skipped', 0, reason)
+    found, passes = _scan_pixels(proposer, pixels, dense=True, flipped=True, cancelled=cancelled)
+    if found:
+        return ('kept', passes, 'A Head or Body was detected')
+    if cancelled():
+        raise ScanCancelled()
     if neighbor_loader is None:
         from annotation_assist import load_neighbors
         neighbor_loader = lambda data, frame, pixels: load_neighbors(data, frame, pixels, strict=True)
     neighbors, warning = neighbor_loader(data, frame, pixels)
+    if cancelled():
+        raise ScanCancelled()
     if warning or len(neighbors) != 2:
-        return ('skipped', 0, warning or 'Both original neighboring frames are required')
+        return ('skipped', passes, warning or 'Both original neighboring frames are required')
     for neighbor in neighbors:
         reason = _quality_reason(neighbor)
         if reason:
-            return ('skipped', 0, f'Neighbor: {reason}')
-    found, passes = _scan_pixels(proposer, pixels, dense=True, flipped=True, cancelled=cancelled)
-    if found:
-        return ('kept', passes, 'A Head or Body was detected')
+            return ('skipped', passes, f'Neighbor: {reason}')
     for neighbor in neighbors:
         found, count = _scan_pixels(proposer, neighbor, dense=False, flipped=False, cancelled=cancelled)
         passes += count
@@ -277,6 +315,10 @@ def run_empty_scan(manifest, *, registry=None, store_factory=None, proposer_fact
                 try:
                     if cancelled():
                         raise ScanCancelled()
+                    candidates = _load_candidates(job, folder)
+                    confidence = job.get('confidence', CONFIDENCE)
+                    if type(confidence) not in (int, float) or not .05 <= confidence <= .95 or not math.isfinite(confidence):
+                        raise ValueError('Invalid empty scan confidence')
                     model = registry.validate(job['model_id'])
                     if Path(model['path']).resolve() != Path(job['model_path']).resolve() or hashlib.sha256(Path(model['path']).read_bytes()).hexdigest() != job['model_sha256']:
                         raise ValueError('The selected detailed model changed before empty screening')
@@ -289,17 +331,27 @@ def run_empty_scan(manifest, *, registry=None, store_factory=None, proposer_fact
                     if Path(store.root).resolve() != Path(job['run_path']).resolve():
                         raise ValueError('The scan store belongs to another recording')
                     if proposer_factory is None:
-                        from model_inference import create_proposer
-                        proposer_factory = create_proposer
-                    proposer = proposer_factory(Path(model['path']), 0, CONFIDENCE, True, strict=True)
+                        from gpu_screening import create_screening_proposer
+                        proposer_factory = create_screening_proposer
+                    proposer = proposer_factory(Path(model['path']), 0, confidence, True, strict=True)
+                    execution = getattr(proposer, 'execution', {})
+                    if isinstance(execution, dict):
+                        update(inference_backend=execution.get('backend'), inference_device=execution.get('device'), runtime_label=execution.get('label'))
                     if image_reader is None:
                         import cv2
                         image_reader = lambda path: cv2.imread(str(path))
-                    print(f"Strict empty scan: {job['total']} untouched candidates; model={model['path']}; confidence={CONFIDENCE}", flush=True)
-                    for candidate in job['candidates']:
+                    print(f"Empty scan: {job['total']} untouched candidates; model={model['path']}; confidence={confidence}", flush=True)
+                    for candidate in candidates:
                         if cancelled():
                             raise ScanCancelled()
-                        data = store.manifest()
+                        frame_context = getattr(store, 'frame_context', None)
+                        if callable(frame_context):
+                            try:
+                                data = frame_context(candidate['id'])
+                            except KeyError:
+                                data = {'frames': []}
+                        else:
+                            data = store.manifest()
                         frame = next((frame for frame in data['frames'] if frame['id'] == candidate['id']), None)
                         decision, passes, reason = ('skipped', 0, 'Frame changed or is no longer an untouched pending frame')
                         if frame is not None and _candidate(frame) and (frame['revision'] == candidate['revision']):
@@ -308,12 +360,16 @@ def run_empty_scan(manifest, *, registry=None, store_factory=None, proposer_fact
                             if cancelled():
                                 raise ScanCancelled()
                             if decision == 'removed':
-                                evidence = dict(decision='empty', model_id=job['model_id'], model_sha256=job['model_sha256'], confidence=CONFIDENCE, detections=0, temporal_frames=2, passes=passes, checked_at=utc_now(), method='strict-onnx-multiview-v1')
+                                evidence = dict(decision='empty', model_id=job['model_id'], model_sha256=job['model_sha256'], confidence=confidence, detections=0, temporal_frames=2, passes=passes, checked_at=utc_now(), method='strict-onnx-multiview-v1')
                                 if not store.mark_auto_removed(frame['id'], candidate['revision'], evidence):
                                     decision, reason = ('skipped', 'Frame was edited during verification')
                         if decision not in ('removed', 'kept', 'skipped'):
                             raise ValueError('Invalid empty scan decision')
-                        update(processed=job['processed'] + 1, **{decision: job[decision] + 1}, message=f"{(frame['id'] if frame else candidate['id'])}: {reason}")
+                        reason_key = ('neighbor_detection' if 'neighboring source frame' in reason else 'current_detection') if decision == 'kept' else decision
+                        reason_counts = {**job.get('reason_counts', {})}
+                        reason_counts[reason_key] = reason_counts.get(reason_key, 0) + 1
+                        print(json.dumps(dict(frame_id=candidate['id'], decision=decision, reason=reason, passes=passes, confidence=confidence), ensure_ascii=False), flush=True)
+                        update(processed=job['processed'] + 1, reason_counts=reason_counts, **{decision: job[decision] + 1}, message=f"{(frame['id'] if frame else candidate['id'])}: {reason}")
                     update(state='completed', message=f"Screening complete: {job['removed']} automatically grouped; {job['kept']} kept; {job['skipped']} skipped. Nothing was approved.")
                     return 0
                 except (ScanCancelled, KeyboardInterrupt):
