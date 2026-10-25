@@ -174,6 +174,9 @@ class AntigravityRunner:
             response=envelope.get('response')
             if not isinstance(response,str) or not response.strip():
                 raise ProviderUnavailable('Antigravity returned no result before its time limit; check image access or use a smaller batch')
+            fenced=re.fullmatch(r'\s*```(?:json)?\s*\n([\s\S]+?)\n```\s*',response)
+            if fenced:
+                response=fenced.group(1)
             reply=json.loads(response)
         if len(items)==1 and isinstance(reply,dict) and 'image_viewed' in reply:
             reply={'frames':[dict(reply,frame_id=items[0][1]['id'])]}
@@ -258,7 +261,8 @@ def _process_image_batch(client,runner,cache,frames,batch_id,total,connection,su
         except (ValueError,OSError,subprocess.SubprocessError) as exc:
             _progress_group(client,'fail',batch_id,checked,error='Provider returned an unusable batch; check the bridge before retrying')
             summary['failed']+=len(checked)
-            raise ProviderUnavailable('Antigravity returned an unusable batch; check its output or try a smaller batch') from exc
+            summary['errors'].append(dict(frame_id=None,error=str(exc)[:200]))
+            raise ProviderUnavailable(f'Antigravity returned an unusable batch: {str(exc)[:200]}') from exc
         for image,frame in ready:
             fid=frame['id']
             if fid not in replies:
