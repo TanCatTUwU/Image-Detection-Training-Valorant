@@ -61,6 +61,10 @@ def yolo_text(boxes):
         rows.append(f"{box['class_id']} {(x1 + x2) / 2:.8f} {(y1 + y2) / 2:.8f} {x2 - x1:.8f} {y2 - y1:.8f}\n")
     return ''.join(rows)
 
+def reviewed_training_frames(data):
+    return [{**frame, 'boxes': [], 'empty_confirmed': True} if frame['status'] == 'rejected' else frame
+            for frame in data['frames'] if frame['status'] in ('approved', 'rejected')]
+
 def _file_signature(stat):
     return (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns)
 
@@ -387,19 +391,32 @@ class ReviewStore:
         with self._locked():
             data = self.manifest()
             self._complete(data)
-            approved = [frame for frame in data['frames'] if frame['status'] == 'approved']
+            approved = reviewed_training_frames(data)
             counts = {split: sum((frame['split'] == split for frame in approved)) for split in ('train', 'val')}
             if not all(counts.values()):
-                raise ValueError('Export requires at least one approved image in both train and val')
-            digests = {}
+                raise ValueError('Export requires at least one reviewed image in both train and val')
+            digests, unique = {}, []
             for frame in approved:
                 image = self._path(frame['image'])
                 if not image.is_file():
-                    raise ValueError(f"Missing approved image: {frame['id']}")
+                    raise ValueError(f"Missing reviewed image: {frame['id']}")
                 digest = hashlib.sha256(image.read_bytes()).hexdigest()
-                if digest in digests and digests[digest] != frame['split']:
-                    raise ValueError('Duplicate image content in both train and val; reject one copy before export')
-                digests[digest] = frame['split']
+                text = yolo_text(frame['boxes'])
+                if digest in digests:
+                    previous_split, previous_text = digests[digest]
+                    if not text and not previous_text:
+                        continue
+                    if previous_split != frame['split']:
+                        raise ValueError('Duplicate image content in both train and val; restore one copy to pending before export')
+                    if previous_text != text:
+                        raise ValueError('Identical frames have conflicting reviewed labels; correct them before export')
+                    continue
+                digests[digest] = frame['split'], text
+                unique.append(frame)
+            approved = unique
+            counts = {split: sum(frame['split'] == split for frame in approved) for split in ('train', 'val')}
+            if not all(counts.values()):
+                raise ValueError('Export requires unique reviewed images in both train and val')
             exports = self._path('exports')
             if exports.is_symlink() or (exports.exists() and (not exports.is_dir())):
                 raise ValueError('exports must be an ordinary run directory')
@@ -421,13 +438,14 @@ class ReviewStore:
                     shutil.copyfile(self._path(frame['image']), destination / 'images' / split / f'{frame_id}.png')
                     (destination / 'labels' / split / f'{frame_id}.txt').write_text(yolo_text(frame['boxes']), encoding='utf-8', newline='\n')
                 (destination / 'dataset.yaml').write_text('path: .\ntrain: images/train\nval: images/val\nnames:\n  0: Head\n  1: Body\n', encoding='utf-8', newline='\n')
-                report = {'schema_version': 1, 'source_run': str(self.root), 'source': data.get('source', {}), 'settings': data.get('settings', {}), 'counts': {status: sum((frame['status'] == status for frame in data['frames'])) for status in sorted(STATUSES)}, 'exported': counts, 'frames': approved}
+                backgrounds = {split: sum(frame['split'] == split and not frame['boxes'] for frame in approved) for split in ('train', 'val')}
+                report = {'schema_version': 1, 'source_run': str(self.root), 'source': data.get('source', {}), 'settings': data.get('settings', {}), 'counts': {status: sum((frame['status'] == status for frame in data['frames'])) for status in sorted(STATUSES)}, 'exported': counts, 'backgrounds': backgrounds, 'frames': approved}
                 (destination / 'review-report.json').write_text(json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False) + '\n', encoding='utf-8')
             except Exception:
                 if destination.is_relative_to(self.root / 'exports') and (not destination.is_symlink()):
                     shutil.rmtree(destination)
                 raise
-            return {'path': str(destination), **counts}
+            return {'path': str(destination), **counts, 'backgrounds': backgrounds}
 
 class BoardProposals:
 
@@ -854,7 +872,7 @@ class EmptyReviewStore(ReviewStore):
         raise KeyError('Open a recording before loading frames')
 
     def export_reviewed(self):
-        raise ValueError('Open a recording with approved frames before exporting')
+        raise ValueError('Open a recording with reviewed frames before exporting')
 
     def update_frame(self, *args, **kwargs):
         raise ValueError('Open a recording before editing frames')
@@ -884,7 +902,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_dir', type=Path, nargs='?', default=PROJECT / 'dataset-runs' / 'recording-data', help='Local draft run containing manifest.json')
     parser.add_argument('--port', type=int, default=8765)
-    parser.add_argument('--export', action='store_true', help='Export only previously approved frames, then exit; does not train')
+    parser.add_argument('--export', action='store_true', help='Export approved frames and rejected background frames, then exit; does not train')
     parser.add_argument('--open-browser', action='store_true')
     args = parser.parse_args(argv)
     try:

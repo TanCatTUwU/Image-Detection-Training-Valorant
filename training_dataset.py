@@ -33,7 +33,7 @@ def validate_recording_selection(recording_ids, validation_ids=()):
 
 
 def export_recordings(project, stores, validation_ids=(), *, background_ratio=0):
-    from review_dataset import yolo_text
+    from review_dataset import reviewed_training_frames, yolo_text
     if type(background_ratio) not in (int, float) or not 0 <= background_ratio <= 1 or not math.isfinite(background_ratio):
         raise ValueError('background_ratio must be a finite number from 0 to 1')
     project = Path(project).resolve(strict=True)
@@ -49,9 +49,9 @@ def export_recordings(project, stores, validation_ids=(), *, background_ratio=0)
         with store._locked():
             data = store.manifest()
             store._complete(data)
-            frames = [frame for frame in data['frames'] if frame['status'] == 'approved']
+            frames = reviewed_training_frames(data)
         if not frames:
-            raise ValueError(f'{store.root.name} has no approved frames')
+            raise ValueError(f'{store.root.name} has no reviewed frames')
         role = ('val' if rid in holdout else 'train') if holdout else None
         source = data.get('source', {})
         original_path = source.get('path') if isinstance(source, dict) else None
@@ -87,7 +87,7 @@ def export_recordings(project, stores, validation_ids=(), *, background_ratio=0)
         for frame in frames:
             counts[role or frame['split']] += 1
     if not all(counts.values()):
-        raise ValueError('Selected recordings need approved training and validation images; approve both saved splits or choose a validation holdout')
+        raise ValueError('Selected recordings need reviewed training and validation images; review both saved splits or choose a validation holdout')
     parent = project / 'training-exports'
     if parent.is_symlink() or parent.resolve().parent != project:
         raise ValueError('Training exports must stay inside the project')
@@ -129,14 +129,18 @@ def export_recordings(project, stores, validation_ids=(), *, background_ratio=0)
                         outgoing.write(block)
                     after = os.fstat(incoming.fileno())
                     if (signature.st_size, signature.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
-                        raise ValueError('An approved image changed during export; try again')
+                        raise ValueError('A reviewed image changed during export; try again')
                 key = digest.digest()
                 if key in digests:
                     previous_split, previous_text = digests[key]
+                    if not text and not previous_text:
+                        target.unlink()
+                        skipped += 1
+                        continue
                     if previous_split != split:
                         raise ValueError('Duplicate image content in both train and val; remove overlapping footage from the selection')
                     if previous_text != text:
-                        raise ValueError('Identical frames have conflicting approved labels; correct them before training')
+                        raise ValueError('Identical frames have conflicting reviewed labels; correct them before training')
                     target.unlink()
                     skipped += 1
                     continue
@@ -146,10 +150,14 @@ def export_recordings(project, stores, validation_ids=(), *, background_ratio=0)
                         pixel_key = _pixel_key(copied.convert('RGB'))
                     if pixel_key in pixel_digests:
                         previous_split, previous_text = pixel_digests[pixel_key]
+                        if not text and not previous_text:
+                            target.unlink()
+                            skipped += 1
+                            continue
                         if previous_split != split:
                             raise ValueError('Duplicate image content in both train and val; remove overlapping footage from the selection')
                         if previous_text != text:
-                            raise ValueError('Identical frames have conflicting approved labels; correct them before training')
+                            raise ValueError('Identical frames have conflicting reviewed labels; correct them before training')
                         target.unlink()
                         skipped += 1
                         continue
@@ -159,12 +167,12 @@ def export_recordings(project, stores, validation_ids=(), *, background_ratio=0)
                 counts[split] += 1
                 negatives[split] += int(not frame['boxes'])
                 exported[split] += 1
-                provenance.append(dict(id=frame['id'], revision=frame['revision'], split=split))
+                provenance.append(dict(id=frame['id'], revision=frame['revision'], split=split, status=frame['status']))
                 if background_ratio and frame['boxes']:
                     crop_sources.append((rid, frame, split, target, recording_report))
             report.append(recording_report)
         if not all(counts.values()):
-            raise ValueError('The combined dataset needs unique approved images in both train and val')
+            raise ValueError('The combined dataset needs unique reviewed images in both train and val')
         if background_ratio:
             from PIL import Image, ImageStat
             remaining = {split: max(0, math.ceil((counts[split] - negatives[split]) * background_ratio) - negatives[split])

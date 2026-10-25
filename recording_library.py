@@ -42,6 +42,7 @@ def _recording_entry(run):
     seen = set()
     counts = {'approved': 0, 'rejected': 0}
     approved_splits = {'train': 0, 'val': 0}
+    reviewed_splits = {'train': 0, 'val': 0}
     backgrounds = 0
     for frame in data['frames']:
         if not isinstance(frame, dict) or not isinstance(frame.get('id'), str) or (not FRAME_ID.fullmatch(frame['id'])) or (frame['id'] in seen) or (frame.get('status') not in ('pending', 'approved', 'rejected', 'auto_removed')) or (frame.get('split') not in ('train', 'val')) or (type(frame.get('revision')) is not int) or (frame['revision'] < 0) or (type(frame.get('empty_confirmed')) is not bool) or (frame.get('width') != 640) or (frame.get('height') != 448) or (not isinstance(frame.get('boxes'), list)):
@@ -66,6 +67,7 @@ def _recording_entry(run):
             raise ValueError('Automatically removed frames must remain empty and unconfirmed')
         if frame['status'] in counts:
             counts[frame['status']] += 1
+            reviewed_splits[frame['split']] += 1
         if frame['status'] == 'approved':
             approved_splits[frame['split']] += 1
             backgrounds += int(not frame['boxes'] and frame['empty_confirmed'])
@@ -73,7 +75,7 @@ def _recording_entry(run):
     if not isinstance(source, dict):
         raise ValueError('Recording source metadata must be an object')
     source_name = Path(str(source.get('path', ''))).name
-    return dict(id=recording_id(run), label=f'{source_name} · {run.name}' if source_name else run.name, path=str(run), status=data['status'], frames=len(data['frames']), approved=counts['approved'], rejected=counts['rejected'], approved_train=approved_splits['train'], approved_val=approved_splits['val'], approved_backgrounds=backgrounds, source_name=source_name)
+    return dict(id=recording_id(run), label=f'{source_name} · {run.name}' if source_name else run.name, path=str(run), status=data['status'], frames=len(data['frames']), approved=counts['approved'], rejected=counts['rejected'], approved_train=approved_splits['train'], approved_val=approved_splits['val'], approved_backgrounds=backgrounds, reviewed=counts['approved'] + counts['rejected'], reviewed_train=reviewed_splits['train'], reviewed_val=reviewed_splits['val'], training_backgrounds=backgrounds + counts['rejected'], source_name=source_name)
 
 def _validate_metadata(metadata):
     if not isinstance(metadata, dict) or (metadata.get('width'), metadata.get('height')) not in ((1280, 882), (1280, 720)):

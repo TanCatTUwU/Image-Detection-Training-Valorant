@@ -171,7 +171,7 @@ class TrainingBoard:
                 raise ValueError('A training job is already running; wait for it to finish')
             exported = export_callback()
             if not isinstance(exported, dict) or not isinstance(exported.get('path'), str) or any((type(exported.get(split)) is not int or exported[split] <= 0 for split in ('train', 'val'))):
-                raise ValueError('Reviewed export must contain approved training and validation images')
+                raise ValueError('Reviewed export must contain training and validation images')
             data = Path(exported['path']).resolve() / 'dataset.yaml'
             from train_model import audit_dataset
             report = audit_dataset(data)
