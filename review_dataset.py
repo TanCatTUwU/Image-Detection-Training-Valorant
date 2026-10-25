@@ -506,12 +506,13 @@ class BoardProposals:
             raise RevisionConflict('This frame changed while suggestions were running. Request them again.')
         return {'frame_id': frame_id, 'revision': revision, 'model_id': model_id, 'boxes': boxes, **assistance}
 
-def make_server(store, port=8765, token=None, *, workbench=None, proposals=None, recording_library=None, empty_scans=None, assistants=None):
+def make_server(store, port=8765, token=None, *, workbench=None, proposals=None, recording_library=None, empty_scans=None, assistants=None, assistant_launcher=None):
     token = token or secrets.token_urlsafe(32)
     workbench_lock = threading.Lock()
     recordings_lock = threading.Lock()
     stores_lock = threading.Lock()
     assistants_lock = threading.Lock()
+    launcher_lock = threading.Lock()
     lifecycle_lock = threading.RLock()
     recording_stores = {store.root: store}
 
@@ -521,6 +522,14 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
             if assistants is None:
                 assistants = AssistantHub(PROJECT, ReviewStore)
             return assistants
+
+    def get_launcher():
+        nonlocal assistant_launcher
+        with launcher_lock:
+            if assistant_launcher is None:
+                from assistant_launcher import AssistantLauncher
+                assistant_launcher=AssistantLauncher(PROJECT,get_assistants(),f'http://127.0.0.1:{server.server_port}/api/assistant')
+            return assistant_launcher
 
     def get_workbench():
         nonlocal workbench
@@ -632,6 +641,8 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                 if parsed.query or len(machine_tokens) != 1 or self.headers.get_all('X-Review-Token', []) or len(recordings) > 1:
                     return (None, self._error(403, 'A separate scoped assistant token is required'))
                 self._assistant_connection = get_assistants().authenticate(machine_tokens[0], recordings[0] if recordings else None)
+                if parsed.path!='/api/assistant/session' and not get_launcher().allows(self._assistant_connection):
+                    raise AssistantUnauthorized('This assistant session is paused or disconnected')
                 return (parsed.path, None)
             if machine_tokens:
                 return (None, self._error(403, 'Assistant tokens cannot access browser review routes'))
@@ -707,7 +718,15 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                     get_assistants().flush(selected)
                     return self._send(200, selected.manifest())
                 if route == '/api/assistants':
-                    return self._send(200, get_assistants().snapshot(self._store()))
+                    selected=self._store()
+                    result=get_assistants().snapshot(selected)
+                    try:
+                        result['launcher']=get_launcher().snapshot(selected)
+                    except (ValueError,OSError,RuntimeError):
+                        result['launcher']=dict(available=False,session=None)
+                    return self._send(200,result)
+                if route == '/api/assistant/session':
+                    return self._send(200,get_launcher().control(self._assistant_connection))
                 if route == '/api/assistant/status':
                     return self._send(200, get_assistants().status(self._assistant_connection))
                 assistant_image = re.fullmatch(r'/api/assistant/image/(frame-[0-9]{6,12})', route)
@@ -749,7 +768,7 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                           '/api/recordings/prepare', '/api/recordings/cancel', '/api/recordings/resume',
                           '/api/training/start', '/api/models/import', '/api/models/convert',
                           '/api/models/select', '/api/directml/run', '/api/empty-scan/start',
-                          '/api/assistants/connect'}
+                          '/api/assistants/connect','/api/assistants/start','/api/assistants/pause','/api/assistants/disconnect'}
             try:
                 path = urlsplit(self.path).path
             except ValueError:
@@ -779,7 +798,23 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                     result['api_base'] = f'http://127.0.0.1:{self.server.server_port}/api/assistant'
                     return self._send(200, result)
                 if route == '/api/assistants/disconnect':
-                    return self._send(200, get_assistants().disconnect(self._store(), payload))
+                    result=get_assistants().disconnect(self._store(),payload)
+                    get_launcher().revoke(payload['connection_id'])
+                    return self._send(200,result)
+                if route == '/api/assistants/start':
+                    if payload:
+                        raise ValueError('Start accepts an empty object for the selected recording')
+                    result=get_launcher().start(self._store(),payload)
+                    if result.get('connection',{}).get('id'):
+                        get_assistants().set_processing_paused(result['connection']['id'],False)
+                    return self._send(200,result)
+                if route == '/api/assistants/pause':
+                    one_id(payload,'connection_id')
+                    result=get_launcher().pause(self._store(),payload)
+                    get_assistants().set_processing_paused(payload['connection_id'],True)
+                    return self._send(200,result)
+                if route == '/api/assistant/session':
+                    return self._send(200,get_launcher().report(self._assistant_connection,payload))
                 if route == '/api/assistant/heartbeat':
                     return self._send(200, get_assistants().status(self._assistant_connection, payload))
                 if route == '/api/assistant/frames':
@@ -858,6 +893,13 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
     server = ThreadingHTTPServer(('127.0.0.1', port), Handler)
     server.daemon_threads = True
     server.review_token = token
+    if (PROJECT/'runtime-data'/'assistant-launcher.json').is_file():
+        def resume_assistants():
+            try:
+                get_launcher().resume()
+            except (ValueError,OSError,RuntimeError):
+                pass
+        threading.Thread(target=resume_assistants,daemon=True).start()
     return server
 
 class EmptyReviewStore(ReviewStore):

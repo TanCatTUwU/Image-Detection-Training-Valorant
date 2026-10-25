@@ -148,6 +148,7 @@ class AssistantHub:
         self._progress = ProgressStore(self.project)
         self._state_cache = {}
         self._migration_signatures = {}
+        self._scope_signature = None
         self._path = self.project / 'runtime-data' / 'assistant-connections.json'
         self._registry = _load(self._path, dict(schema_version=1, connections={}))
         if not isinstance(self._registry.get('connections'), dict):
@@ -212,6 +213,10 @@ class AssistantHub:
         return store._manifest_snapshot(clone=False) if hasattr(store, '_manifest_snapshot') else store.manifest()
 
     def _migrate_progress(self, store, state):
+        scopes=tuple(sorted((entry['id'],entry['recording_id'],entry['provider']) for entry in self._registry['connections'].values()))
+        if scopes!=self._scope_signature:
+            self._progress.bind_scopes(scopes)
+            self._scope_signature=scopes
         signature = self._signature(store._path('assistant-state.json'))
         if self._migration_signatures.get(store.root, object()) == signature:
             return
@@ -254,6 +259,12 @@ class AssistantHub:
         owned = [entry for entry in requests if entry['connection_id'] == connection['id']]
         manifest = manifest if manifest is not None else self._manifest(store)
         progress = self._progress.snapshot(connection['id'], {frame['id']: frame for frame in manifest['frames']})
+        if connection['provider']=='antigravity':
+            completed=self._progress.recording_completed(connection['recording_id'],'antigravity')
+            current_ids={frame['id'] for frame in manifest['frames']}
+            progress['processed']=sum(fid in current_ids for fid in completed)
+            if not progress['last_completed_frame']:
+                progress['last_completed_frame']=self._progress.recording_last(connection['recording_id'],'antigravity')
         return dict(id=connection['id'], name=connection['name'], provider=connection['provider'], recording_id=connection['recording_id'], status=self._status(connection), last_seen=connection.get('last_seen'), processed=progress['processed'], queued=sum(entry['state'] == 'queued' for entry in owned), last_error=connection.get('last_error'), usage=self._usage(connection), progress=progress)
 
     def connect(self, store, payload):
@@ -298,6 +309,30 @@ class AssistantHub:
         connection = self._registry['connections'].get(connection_id)
         if connection is None or not self._valid(connection):
             raise AssistantUnauthorized('The assistant token is invalid, expired, or disconnected')
+        return connection
+
+    def set_processing_paused(self, connection_id, paused):
+        if type(paused) is not bool:
+            raise ValueError('Assistant pause state must be boolean')
+        with self._lock:
+            connection=self._connection(connection_id)
+            if bool(connection.get('processing_paused',False))==paused:
+                return
+            previous=connection.get('processing_paused')
+            connection['processing_paused']=paused
+            try:
+                self._save()
+            except Exception:
+                if previous is None:
+                    connection.pop('processing_paused',None)
+                else:
+                    connection['processing_paused']=previous
+                raise
+
+    def _processing_connection(self, connection_id):
+        connection=self._connection(connection_id)
+        if connection.get('processing_paused'):
+            raise AssistantUnauthorized('This assistant session is paused')
         return connection
 
     def snapshot(self, store):
@@ -346,7 +381,7 @@ class AssistantHub:
 
     def status(self, connection_id, payload=None):
         with self._lock:
-            connection = self._connection(connection_id)
+            connection = self._processing_connection(connection_id)
             if payload is not None:
                 if not isinstance(payload, dict) or set(payload) - {'usage'}:
                     raise ValueError('Heartbeat accepts only an optional usage snapshot')
@@ -363,12 +398,12 @@ class AssistantHub:
         if not isinstance(payload, dict) or set(payload) != {'limit', 'cursor'} or type(payload['limit']) is not int or not 1 <= payload['limit'] <= 16 or type(payload['cursor']) is not int or payload['cursor'] < 0:
             raise ValueError('Expected integer limit 1..16 and non-negative integer cursor')
         with self._lock:
-            connection = self._connection(connection_id)
+            connection = self._processing_connection(connection_id)
             store = self._store(connection)
             self.flush(store)
             manifest = self._manifest(store)
             self._migrate_progress(store, self._state(store, clone=False))
-            completed = self._progress.completed(connection_id)
+            completed = self._progress.recording_completed(connection['recording_id'],'antigravity') if connection['provider']=='antigravity' else self._progress.completed(connection_id)
             frames, cursor = [], min(payload['cursor'], len(manifest['frames']))
             while cursor < len(manifest['frames']) and len(frames) < payload['limit']:
                 frame = manifest['frames'][cursor]
@@ -382,7 +417,7 @@ class AssistantHub:
 
     def image_path(self, connection_id, frame_id):
         with self._lock:
-            connection = self._connection(connection_id)
+            connection = self._processing_connection(connection_id)
             store = self._store(connection)
             with store._thread_lock:
                 frame = store._frame(self._manifest(store), frame_id)
@@ -407,7 +442,7 @@ class AssistantHub:
     def progress(self, connection_id, payload):
         event, batch_id, entries, total, error = validate_event(payload, FRAME_ID)
         with self._lock:
-            connection = self._connection(connection_id)
+            connection = self._processing_connection(connection_id)
             store = self._store(connection)
             with store._locked():
                 manifest = self._manifest(store)
@@ -508,7 +543,7 @@ class AssistantHub:
     def submit(self, connection_id, payload):
         normalized, fingerprint, request_id = _submission(payload)
         with self._lock:
-            connection = self._connection(connection_id)
+            connection = self._processing_connection(connection_id)
             store = self._store(connection)
             self.flush(store)
             state = self._state(store)
@@ -564,6 +599,8 @@ class AssistantHub:
                 if entry['state'] != 'queued':
                     continue
                 connection = self._registry['connections'].get(entry['connection_id'])
+                if connection and connection.get('processing_paused') and self._valid(connection):
+                    continue
                 try:
                     if connection is None or not self._valid(connection) or connection['recording_id'] != _recording_id(store.root):
                         raise AssistantConflict('The queued assistant connection expired or was disconnected')

@@ -16,7 +16,7 @@ from http.client import HTTPException
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
-from assistant_loop import AssistantRequestError, ServerUnavailable, QuotaExhausted, ProviderUnavailable, ProviderTemporaryError, connection_cache, run_continuously
+from assistant_loop import AssistantRequestError, ServerUnavailable, QuotaExhausted, ProviderUnavailable, ProviderTemporaryError, ProviderSessionEnded, connection_cache, run_continuously
 from assistant_session import PersistentCLI
 
 PROJECT=Path(__file__).resolve().parent
@@ -66,7 +66,7 @@ class AssistantClient:
             self.sleep(min(2**attempt,8))
 
     def request(self,route,payload=None):
-        if route not in ('/status','/heartbeat','/frames','/boxes','/progress'):
+        if route not in ('/status','/heartbeat','/frames','/boxes','/progress','/session'):
             raise ValueError('Unsupported scoped assistant operation')
         return self._send(self.api_base+route,payload)
 
@@ -164,8 +164,11 @@ class AntigravityRunner:
         timeout=max(90,30*len(items))
         command=[self.executable,'--log-file',str(log_path),'--model',self.model,'--mode','accept-edits','--sandbox','--add-dir',str(workspace),
                  '--disable-slash-commands','--print-timeout',f'{timeout}s','--output-format','json','--print',prompt]
-        result=self.run(command,cwd=str(workspace),capture_output=True,text=True,encoding='utf-8',errors='replace',timeout=timeout+15,
-                        stdin=subprocess.DEVNULL,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+        try:
+            result=self.run(command,cwd=str(workspace),capture_output=True,text=True,encoding='utf-8',errors='replace',timeout=timeout+15,
+                            stdin=subprocess.DEVNULL,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+        except subprocess.TimeoutExpired:
+            raise ProviderSessionEnded('The Antigravity CLI session timed out') from None
         failure=(result.stdout[-8192:]+'\n'+result.stderr[-8192:]).lower()
         if len(result.stdout)>2*1024*1024:
             raise ValueError('Antigravity response is too large')
@@ -484,7 +487,7 @@ def main(argv=None):
                                         idle_seconds=args.idle_seconds,cursor=args.cursor,on_batch=report)
             result['tokens_used']=runner.total_tokens
         print(json.dumps(result,ensure_ascii=False,allow_nan=False))
-        return 2 if result.get('state') in ('server_unavailable','access_unavailable','provider_unavailable') else 0
+        return 2 if result.get('state') in ('server_unavailable','access_unavailable','provider_unavailable','session_ended') else 0
     except KeyboardInterrupt:
         print('Assistant bridge stopped.',file=sys.stderr)
         return 130

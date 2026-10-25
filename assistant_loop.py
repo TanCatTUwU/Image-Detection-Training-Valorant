@@ -25,6 +25,9 @@ class ProviderUnavailable(ValueError):
 class ProviderTemporaryError(ProviderUnavailable):
     pass
 
+class ProviderSessionEnded(ProviderUnavailable):
+    pass
+
 
 def quota_exhausted(status, model):
     usage = status.get('connection', {}).get('usage') or {}
@@ -115,7 +118,7 @@ def run_continuously(client, runner, cache_root, *, process_batch, batch_size=4,
                 status = client.request('/status')
         except (QuotaExhausted, ServerUnavailable, ProviderUnavailable) as error:
             merge(getattr(error, 'summary', {}))
-            result['state'] = 'quota_exhausted' if isinstance(error,QuotaExhausted) else 'server_unavailable' if isinstance(error,ServerUnavailable) else 'provider_unavailable'
+            result['state'] = 'quota_exhausted' if isinstance(error,QuotaExhausted) else 'server_unavailable' if isinstance(error,ServerUnavailable) else 'session_ended' if isinstance(error,ProviderSessionEnded) else 'provider_unavailable'
             result['message'] = str(error)
             if isinstance(error,ProviderTemporaryError) and provider_retries>=5:
                 result['message']+=' after five automatic retries'

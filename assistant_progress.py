@@ -78,6 +78,12 @@ class ProgressStore:
                     last_completed_frame TEXT,
                     updated_at TEXT
                 );
+                CREATE TABLE IF NOT EXISTS progress_scopes (
+                    connection_id TEXT PRIMARY KEY,
+                    recording_id TEXT NOT NULL,
+                    provider TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS progress_scope_recording ON progress_scopes(recording_id,provider);
             ''')
             database.execute('BEGIN IMMEDIATE')
             yield database
@@ -132,6 +138,33 @@ class ProgressStore:
     def completed(self, connection_id):
         with self.transaction() as database:
             return {row['frame_id']: row['completed_revision'] for row in database.execute('SELECT frame_id,completed_revision FROM frame_progress WHERE connection_id=? AND ever_completed=1', (connection_id,))}
+
+    def bind_scopes(self, scopes):
+        if not scopes:
+            return
+        with self.transaction() as database:
+            for connection_id,recording_id,provider in scopes:
+                if not re.fullmatch(r'assistant-[a-f0-9]{24}',connection_id) or not re.fullmatch(r'run-[a-f0-9]{24}',recording_id) or provider not in ('antigravity','custom'):
+                    raise ValueError('Invalid recording progress scope')
+                old=database.execute('SELECT recording_id,provider FROM progress_scopes WHERE connection_id=?',(connection_id,)).fetchone()
+                if old and (old['recording_id'],old['provider'])!=(recording_id,provider):
+                    raise ValueError('A saved assistant progress scope cannot change')
+                database.execute('INSERT OR IGNORE INTO progress_scopes(connection_id,recording_id,provider) VALUES(?,?,?)',(connection_id,recording_id,provider))
+
+    def recording_completed(self, recording_id, provider):
+        with self.transaction() as database:
+            return {row['frame_id']:row['revision'] for row in database.execute('''
+                SELECT progress.frame_id,MAX(progress.completed_revision) AS revision FROM frame_progress AS progress
+                JOIN progress_scopes AS scope ON progress.connection_id=scope.connection_id
+                WHERE scope.recording_id=? AND scope.provider=? AND progress.ever_completed=1 GROUP BY progress.frame_id''',(recording_id,provider))}
+
+    def recording_last(self, recording_id, provider):
+        with self.transaction() as database:
+            row=database.execute('''SELECT progress.last_completed_frame FROM connection_progress AS progress
+                JOIN progress_scopes AS scope ON progress.connection_id=scope.connection_id
+                WHERE scope.recording_id=? AND scope.provider=? AND progress.last_completed_frame IS NOT NULL
+                ORDER BY progress.updated_at DESC,scope.connection_id DESC LIMIT 1''',(recording_id,provider)).fetchone()
+            return row['last_completed_frame'] if row else None
 
     def snapshot(self, connection_id, frames):
         with self.transaction() as database:

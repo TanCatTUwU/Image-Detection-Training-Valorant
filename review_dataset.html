@@ -47,6 +47,7 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid #4b5564;border-
 @media(max-width:760px){.sidebar-group .frame-list{display:flex;max-height:180px}.sidebar-group .counts{grid-template-columns:repeat(4,1fr)}.sidebar-group .assistant-connections{display:block;max-height:180px}.training-recordings{padding:10px}.training-recording-row{gap:8px}.training-recording-row .validation-choice{font-size:10px}.training-recording-list{max-height:180px}.metric-summary{grid-template-columns:repeat(3,minmax(0,1fr))}.metric-value{padding:7px}.metric-value strong{font-size:15px}.training-plots{grid-template-columns:1fr}.training-guidance{padding:8px 10px}.training-recordings-head{align-items:flex-start}.training-plot{padding:7px}}
 .lifecycle-buttons{display:flex;flex-wrap:wrap;gap:6px}.delete-reason{font-size:11px;color:var(--muted);margin:0;overflow-wrap:anywhere}.deleted-items-dialog{width:580px}.deleted-list{display:grid;gap:9px;margin-top:14px}.deleted-item{border:1px solid var(--line);border-radius:5px;padding:11px;display:flex;align-items:flex-start;gap:12px}.deleted-item-copy{flex:1;min-width:0;overflow-wrap:anywhere}.deleted-item strong{display:block;font-size:12px}.deleted-item p{margin:3px 0 0;font-size:11px}.deleted-item button{flex-shrink:0}.delete-guard{color:var(--amber)}#deleteTarget{overflow-wrap:anywhere}#deletedItemsMessage{margin-bottom:0}@media(max-width:760px){.recording-footer{flex-wrap:wrap}.recording-footer button{flex:1 1 calc(50% - 7px);width:auto}.recording-footer .delete-reason{flex-basis:100%}.deleted-item{flex-wrap:wrap}.model-bar .delete-reason{width:100%}}
 .frame-list{gap:0}.frame-list .frame-item{height:52px;min-height:52px;flex:none;margin:0 0 4px}.frame-list-spacer{flex:none;pointer-events:none}
+.assistant-manual{margin-top:9px;font-size:10px;color:var(--muted)}.assistant-manual>summary{padding:3px 0}.assistant-manual>summary:focus-visible{outline:2px solid #a9bbd4;outline-offset:2px}.assistant-manual>button{margin-top:6px;font-size:10px;padding:4px 6px}.assistant-manual .help{font-size:10px;margin:5px 0 0}#assistantLauncherStatus{font-size:10px;min-height:15px;margin:6px 0 0}
 </style>
 </head>
 <body>
@@ -58,7 +59,7 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid #4b5564;border-
 <details class="sidebar-group" data-sidebar-group="progress" open><summary>Review progress</summary><div class="sidebar-group-content"><div id="source" class="source muted">Loading recording…</div><div class="progress"><div id="progressBar"></div></div><div id="progressText" class="muted" style="font-size:11px">—</div><div class="counts"><div><strong id="pendingCount">0</strong><span>Pending</span></div><div><strong id="approvedCount">0</strong><span>Approved</span></div><div><strong id="rejectedCount">0</strong><span>Rejected</span></div><div><strong id="autoRemovedCount">0</strong><span>Auto removed</span></div></div></div></details>
 <details class="sidebar-group" data-sidebar-group="frames" open><summary>Frames</summary><div class="sidebar-group-content"><label for="filter" class="muted" style="font-size:11px">Filter frames</label><select id="filter" class="filter"><option value="pending">Pending</option><option value="all">All frames</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="auto_removed">Auto removed</option></select><button id="rejectAutoRemoved" class="small danger" hidden>Reject all auto removed</button><div id="frameList" class="frame-list"></div></div></details>
 <details class="sidebar-group" data-sidebar-group="empty-scan" open><summary>Empty scan</summary><div class="sidebar-group-content"><section class="empty-scan-controls" aria-label="Empty frame scan"><label for="emptyScanConfidence" class="muted" style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;margin-bottom:7px">Confidence<select id="emptyScanConfidence" aria-label="Empty scan confidence" title="Higher thresholds reduce false detections but may miss faint or occluded targets."><option value="0.08">8% · conservative</option><option value="0.25" selected>25% · balanced</option><option value="0.4">40%</option><option value="0.6">60%</option></select></label><button id="startEmptyScan" class="small" disabled title="Checks untouched, unboxed pending frames with the selected model family. Removed frames remain recoverable.">Scan empty frames</button><p id="emptyScanEligibility" class="muted" style="font-size:11px;margin:6px 0" aria-live="polite"></p><div id="emptyScanStatus" hidden><div class="scan-heading"><strong id="emptyScanTitle">Empty scan</strong><button id="cancelEmptyScan" class="small" hidden>Cancel</button></div><p id="emptyScanMessage"></p><div class="progress"><div id="emptyScanProgress"></div></div><div id="emptyScanCounts"></div><div id="emptyScanModel"></div><div id="emptyScanReasons"></div></div><p id="emptyScanError" class="workbench-error" role="status" hidden></p></section></div></details>
-<details class="sidebar-group" data-sidebar-group="assistant" open><summary>Assistant</summary><div class="sidebar-group-content"><section id="assistantPanel" class="assistant-panel" aria-label="Connected assistants"><div class="assistant-heading"><button id="connectAssistant" class="small" type="button">Connect assistant</button></div><p class="help">Pending frames only · Dashed AI boxes</p><div id="assistantConnections" class="assistant-connections"><p class="help">Loading connections…</p></div><p id="assistantMessage" class="assistant-message" role="status" aria-live="polite" hidden></p></section></div></details>
+<details class="sidebar-group" data-sidebar-group="assistant" open><summary>Assistant</summary><div class="sidebar-group-content"><section id="assistantPanel" class="assistant-panel" aria-label="Connected assistants"><div class="assistant-heading"><button id="startAssistant" class="primary small" type="button" disabled>Start Antigravity</button></div><p id="assistantLauncherStatus" class="assistant-message" role="status" aria-live="polite">Loading Antigravity…</p><p class="help">Opens Command Prompt and resumes pending frames. One authorization covers the full session, including worker restarts, until Disconnect or access expires. Progress is saved per recording. Sign-in or broader access needs your action.</p><details class="assistant-manual"><summary>Manual connection</summary><button id="connectAssistant" class="small" type="button">Connect assistant</button><p class="help">Connect another assistant using a private API configuration.</p></details><p class="help">Pending frames only · Dashed AI boxes for review</p><div id="assistantConnections" class="assistant-connections"><p class="help">Loading connections…</p></div><p id="assistantMessage" class="assistant-message" role="status" aria-live="polite" hidden></p></section></div></details>
 </section>
 <section id="recordingsPanel" class="sidebar-panel" role="tabpanel" aria-labelledby="recordingsTab" hidden><details class="sidebar-group" data-sidebar-group="recordings" open><summary>Recordings</summary><div class="sidebar-group-content"><div class="recordings-scroll"><p id="recordingUnavailable" class="help">Loading recordings…</p><section id="recordingBar" class="recording-bar" aria-label="Local recordings" hidden><label for="recordingSelect">Recording</label><select id="recordingSelect" size="9" disabled aria-label="Recordings"><option value="">Current recording</option></select><p id="recordingStatus" class="help">Loading recordings…</p><div id="recordingError" class="workbench-error" role="status" hidden></div></section><section id="preparationStatus" class="job-card" aria-label="Video preparation progress" hidden><div class="job-title"><strong id="preparationTitle">Preparing frames</strong><button id="openPreparedRecording" class="small" hidden>Open recording</button></div><div class="lifecycle-buttons"><button id="cancelPreparation" class="small" hidden>Cancel preparation</button><button id="resumePreparation" class="small" hidden>Resume preparation</button></div><p id="preparationMessage"></p><div class="progress"><div id="preparationProgress"></div></div><div id="preparationCounts" class="model-detail"></div><details><summary class="help">Details and log</summary><div id="preparationPath" class="model-detail"></div><pre id="preparationLog" class="job-log"></pre></details></section></div><div class="recording-footer"><button id="browseVideo" class="small" disabled>Browse video…</button><button id="openPreparation" class="small" disabled>Prepare frames…</button><button id="resumeRecording" class="small" hidden>Resume preparation</button><button id="deleteRecording" class="small danger" disabled>Delete recording</button><p id="deleteRecordingReason" class="delete-reason" hidden></p><button id="openDeletedItems" class="small">Deleted items…</button></div></div></details></section></aside>
 <main><div id="running" class="running" hidden>Preparing frames. Open this recording again when it finishes.</div><div class="heading"><div><h1 id="frameTitle">Loading frames</h1><div id="meta" class="meta"></div></div></div>
@@ -102,6 +103,7 @@ let gridSelection=new Set(), gridSelectionContext="", pendingGridReview=null, pe
 let emptyScan=null, emptyScanLoading=false, emptyScanAction=false, emptyScanSequence=0, emptyScanAvailable=true;
 let scanManifestPending=false, scanManifestLoading=false, scanMessage="";
 let assistantConnections=[], assistantProviders=["antigravity"], assistantLoaded=false, assistantLoading=false, assistantAction=false, assistantSequence=0, assistantManifestLoading=false, assistantsAvailable=true;
+let assistantLauncher={available:false,session:null};
 let assistantManifestVersion=null, assistantLastManifestRefresh=0;
 let frameRowFilter="", frameRowScrollRequest=null;
 let frameRowGeneration=-1, frameRowCache=new Map(), frameRowsBusy=null, boxRows=[];
@@ -206,7 +208,7 @@ function updateButtons() {
   $("previous").disabled = busy || index <= 0; $("next").disabled = busy || index < 0 || index >= list.length - 1;
   $("position").textContent = index < 0 ? "0 frames" : `${index + 1} / ${list.length}`;
   $("dirty").hidden = !dirty;
-  $("connectAssistant").disabled=assistantAction || !assistantsAvailable || manifest?.status!=="complete";
+  $("connectAssistant").disabled=assistantAction || !assistantsAvailable || manifest?.status!=="complete"; renderAssistantLauncher();
   for(const id of ["save","reject","approve"]) $(id).hidden=gridSize!==1;
   if(frame?.status==="auto_removed") $("save").hidden=true;
   $("gridSize").disabled=busy || !!drag;
@@ -656,11 +658,13 @@ function assistantStatus(value) {
 function assistantInstructionsFor(provider) {
   return provider==="antigravity"?`Goal: Review pending frames in this connected recording and add only clearly visible missing Head / Body boxes. Leave boxes pending for human review.
 
-Plan: Approve and start the bridge once for this recording. One headless Antigravity session stays open across all four-frame batches. It downloads full-resolution images, submits dashed additions, updates progress after every batch, then continues automatically. Do not request approval for each frame, batch, model call, retry or progress update. When no eligible frames remain, it waits 10 seconds and checks again without making model calls.
+Plan: Click Start Antigravity on the board to open Command Prompt, connect this recording and start processing. Approve the full logical session once. One headless Antigravity session processes all four-frame batches and can reopen its worker after a crash within the same authorization. It downloads full-resolution images, submits dashed additions, updates progress after every batch, then continues automatically. Do not request approval for each frame, batch, model call, retry, worker restart or progress update. When no eligible frames remain, it waits 10 seconds and checks again without making model calls.
 
-Allowed work: The existing scoped connection permits reading pending frame images and submitting annotations/progress for this recording. The bridge writes only its local cache. Do not approve or reject frames, train or switch models, edit project code, broaden access, disable permissions, or create other tasks. The initial approval covers repeated batches in this same recording. Model and local API calls continue internally without separate approval. Do not ask permission again within this scope. If existing access is insufficient, stop with a clear error; never expand access or bypass a security check.
+Allowed work: The existing scoped connection permits reading pending frame images and submitting annotations/progress for this recording. The bridge writes only its local cache. Do not approve or reject frames, train or switch models, edit project code, broaden access, disable permissions, or create other tasks. The initial approval covers the entire logical session across repeated batches and worker restarts in this same recording until Disconnect or token expiry. Model and local API calls continue internally without separate approval. Do not ask permission again within this scope. If existing access is insufficient, stop with a clear error; never expand access or bypass a security check. Sign-in and any new or broader access require human action.
 
-Save the copied configuration as assistant-connection.json beside assistant_bridge.py.
+Progress is saved per recording. Completed frames with unchanged revisions are skipped after worker, board or connection restarts. Changed pending frames become eligible again. Pause retains this session and its saved progress; Resume continues the same session. Disconnect revokes access and keeps the recording's saved progress.
+
+Automatic launch keeps its private configuration on the server. No configuration needs to be copied. For a manual connection, save the copied configuration as assistant-connection.json beside assistant_bridge.py.
 
 Check the connection without model calls:
 python assistant_bridge.py --connection-file assistant-connection.json --check
@@ -672,7 +676,7 @@ The default model is gemini-3.8-flash-low for faster review. Use --model gemini-
 
 Optional: --batch-size 1..8 changes images per batch within the same session. --once reviews one batch; --frames 4 limits a test run to four frames.
 
-Stop conditions: Provider quota is exhausted, access is revoked, or the server remains unavailable after the initial attempt plus at least five retries with backoff. Temporary provider outages also receive five automatic retries in the same session. Invalid sign-in, unreadable images, invalid model output or an ended CLI session stop with a clear error and do not launch approval requests. Ctrl+C stops the bridge; Disconnect on the board revokes its access. Normal sandbox and tool permissions remain enabled.
+Stop conditions: Provider quota is exhausted, access is revoked or expires, or the server remains unavailable after the initial attempt plus at least five retries with backoff. Temporary provider outages also receive five automatic retries in the same session. The automatic launcher can reopen an ended CLI worker with bounded retries under the existing authorization. Invalid sign-in, unreadable images, invalid model output or insufficient access stop with a clear error and do not launch approval requests. Use Pause on the board to pause automatic processing. Ctrl+C stops a manual bridge; Disconnect on the board revokes its access. Normal sandbox and tool permissions remain enabled.
 
 Head = class 0; Body = class 1. Boxes remain pending for review. Protect the configuration secret. Disconnect here to revoke API access.`:`Use api_base and the X-Assistant-Token header from the copied configuration. Never put the secret in a URL.
 
@@ -686,8 +690,23 @@ POST /progress with {"event":"complete","batch_id":"batch-1","frames":[{"frame_i
 
 Coordinates are normalized from 0 to 1. Head = class 0; Body = class 1. Review conflicts before retrying. Boxes remain pending for human review. POST /heartbeat can report actual usage windows. Disconnect here to revoke API access.`;
 }
+function assistantLaunchBlocked() {
+  return assistantAction || !assistantsAvailable || manifest?.status!=="complete" || (typeof busy!=="undefined" && busy) || (typeof recordingAction!=="undefined" && recordingAction) || (typeof lifecycleAction!=="undefined" && lifecycleAction);
+}
+function renderAssistantLauncher() {
+  if(typeof assistantLauncher==="undefined") return;
+  const launcher=assistantLauncher, session=launcher?.session, active=session?.active===true;
+  const button=$("startAssistant"), status=$("assistantLauncherStatus");
+  button.textContent=active?"Pause":session?.phase==="paused"?"Resume":"Start Antigravity";
+  button.disabled=assistantLaunchBlocked() || !launcher?.available;
+  button.setAttribute("aria-busy",String(assistantAction));
+  const error=!!session && ["error","failed","blocked","auth_required","quota_exhausted","server_unavailable","access_unavailable","provider_unavailable","invalid_output","expired"].includes(session.phase);
+  const phases={starting:"Starting Antigravity…",running:"Reviewing pending frames.",paused:"Paused. Progress is saved.",restarting:"Restarting the worker in this session…",stopped:"Session stopped. Start Antigravity to continue.",disconnected:"Assistant disconnected.",expired:"Access expired. Start Antigravity to reconnect."};
+  status.textContent=assistantAction?(active?"Pausing Antigravity…":"Starting Antigravity…"):session?(typeof session.message==="string" && session.message?session.message:phases[session.phase] || "Check PowerShell for session details."):!assistantsAvailable?"Assistant connections unavailable.":typeof assistantLoaded!=="undefined" && !assistantLoaded?"Loading Antigravity…":!launcher?.available?"Automatic launch unavailable. Use a manual connection.":"Ready to review this recording.";
+  status.classList.toggle("error",error && !assistantAction);
+}
 function renderAssistants() {
-  $("connectAssistant").disabled=assistantAction || !assistantsAvailable || manifest?.status!=="complete";
+  $("connectAssistant").disabled=assistantAction || !assistantsAvailable || manifest?.status!=="complete"; renderAssistantLauncher();
   const provider=$("assistantProvider"), selectedProvider=provider.value;
   const choices=assistantProviders.filter(value=>["antigravity","custom"].includes(value));
   if(JSON.stringify([...provider.options].map(option=>option.value))!==JSON.stringify(choices)) { provider.replaceChildren(); for(const value of choices) { const option=document.createElement("option"); option.value=value; option.textContent=value==="antigravity"?"Antigravity":"Other AI"; provider.append(option); } if(choices.includes(selectedProvider)) provider.value=selectedProvider; }
@@ -755,7 +774,7 @@ function showAssistantInstructions(provider) {
   $("assistantDialog").showModal();
 }
 function resetAssistants() {
-  assistantSequence++; assistantConnections=[]; assistantLoaded=false; assistantLoading=false; assistantAction=false; assistantManifestLoading=false; assistantManifestVersion=null; assistantLastManifestRefresh=0; assistantsAvailable=true; closeAssistantDialog(); assistantMessage(); renderAssistants();
+  assistantSequence++; assistantConnections=[]; assistantLauncher={available:false,session:null}; assistantLoaded=false; assistantLoading=false; assistantAction=false; assistantManifestLoading=false; assistantManifestVersion=null; assistantLastManifestRefresh=0; assistantsAvailable=true; closeAssistantDialog(); assistantMessage(); renderAssistants();
 }
 async function refreshAssistantManifest(annotationVersion=null) {
   if(assistantManifestLoading || scanManifestLoading || busy || dirty || drag || proposing || proposal || $("emptyDialog").open || !manifest || (gridSize===1 && frame && !image)) return;
@@ -784,14 +803,28 @@ async function refreshAssistants(fromTimer=false) {
     if(generation!==recordingSequence || request!==assistantSequence) return;
     const connections=Array.isArray(result.connections)?result.connections.filter(connection=>!["disconnected","revoked"].includes(connection.status)):[];
     const providers=Array.isArray(result.providers)?result.providers:["antigravity"];
-    const changed=!assistantLoaded || JSON.stringify(connections)!==JSON.stringify(assistantConnections) || JSON.stringify(providers)!==JSON.stringify(assistantProviders) || !assistantsAvailable;
-    assistantConnections=connections; assistantProviders=providers; assistantLoaded=true; assistantsAvailable=true; assistantMessage(); if(changed || connections.some(connection=>connection.usage?.windows?.some(window=>window.reset_at && new Date(typeof window.reset_at==="number" && window.reset_at<1e12?window.reset_at*1000:window.reset_at).getTime()<Date.now()))) renderAssistants();
+    const launcher=result.launcher && typeof result.launcher.available==="boolean"?result.launcher:{available:false,session:null};
+    const changed=!assistantLoaded || JSON.stringify(connections)!==JSON.stringify(assistantConnections) || JSON.stringify(providers)!==JSON.stringify(assistantProviders) || JSON.stringify(launcher)!==JSON.stringify(typeof assistantLauncher==="undefined"?null:assistantLauncher) || !assistantsAvailable;
+    assistantConnections=connections; assistantProviders=providers; assistantLauncher=launcher; assistantLoaded=true; assistantsAvailable=true; assistantMessage(); if(changed || connections.some(connection=>connection.usage?.windows?.some(window=>window.reset_at && new Date(typeof window.reset_at==="number" && window.reset_at<1e12?window.reset_at*1000:window.reset_at).getTime()<Date.now()))) renderAssistants();
     if(connections.some(connection=>!["revoked","disconnected","expired"].includes(connection.status))) {
       const annotationVersion=typeof result.annotation_version==="string"?result.annotation_version:null;
       if(annotationVersion!==null?annotationVersion!==assistantManifestVersion:!fromTimer || Date.now()-assistantLastManifestRefresh>=3000) await refreshAssistantManifest(annotationVersion);
     }
   } catch(error) { if(generation===recordingSequence && request===assistantSequence) { if(error.status===404) assistantsAvailable=false; assistantMessage(error.status===404?"Connections unavailable on this server.":"Connections could not refresh. Will retry.",error.status!==404); renderAssistants(); } }
   finally { if(generation===recordingSequence && request===assistantSequence) { assistantLoading=false; $("connectAssistant").disabled=assistantAction || !assistantsAvailable || manifest?.status!=="complete"; } }
+}
+async function controlAssistant() {
+  if(assistantLaunchBlocked() || !assistantLauncher.available) return;
+  const session=assistantLauncher.session, pausing=session?.active===true;
+  const generation=recordingSequence, recordingId=selectedRecordingId, request=++assistantSequence;
+  assistantAction=true; closeAssistantDialog(); assistantMessage(); renderAssistants();
+  try {
+    const result=await api(pausing?"/api/assistants/pause":"/api/assistants/start",pausing?{connection_id:session.connection_id}:{},recordingId);
+    if(generation!==recordingSequence || request!==assistantSequence) return;
+    if(!result.connection || typeof result.connection.id!=="string" || !result.launcher || typeof result.launcher.available!=="boolean" || !result.launcher.session || result.launcher.session.connection_id!==result.connection.id) throw new Error("Invalid launcher response");
+    assistantConnections=[...assistantConnections.filter(connection=>connection.id!==result.connection.id),result.connection]; assistantLauncher=result.launcher; assistantLoaded=true; assistantsAvailable=true;
+  } catch(error) { if(generation===recordingSequence && request===assistantSequence) assistantMessage(pausing?"Could not pause Antigravity. Try again.":"Could not start Antigravity. Check PowerShell or try again.",true); }
+  finally { if(generation===recordingSequence && request===assistantSequence) { assistantAction=false; assistantLoading=false; renderAssistants(); } }
 }
 async function createAssistant(event) {
   event.preventDefault(); if(assistantAction) return;
@@ -814,7 +847,7 @@ async function createAssistant(event) {
 async function disconnectAssistant(id) {
   if(assistantAction) return;
   const generation=recordingSequence,recordingId=selectedRecordingId; assistantAction=true; assistantSequence++; renderAssistants();
-  try { await api("/api/assistants/disconnect",{connection_id:id},recordingId); if(generation===recordingSequence) { assistantConnections=assistantConnections.filter(connection=>connection.id!==id); assistantMessage("Assistant disconnected."); } }
+  try { await api("/api/assistants/disconnect",{connection_id:id},recordingId); if(generation===recordingSequence) { assistantConnections=assistantConnections.filter(connection=>connection.id!==id); if(assistantLauncher.session?.connection_id===id) assistantLauncher={...assistantLauncher,session:null}; assistantMessage("Assistant disconnected. Recording progress is saved."); } }
   catch(error) { if(generation===recordingSequence) assistantMessage("Could not disconnect the assistant. Try again.",true); }
   finally { if(generation===recordingSequence) { assistantAction=false; assistantLoading=false; renderAssistants(); } }
 }
@@ -1512,7 +1545,8 @@ function undo() {
   if(restorePreview) proposal=state.proposal;
   setDirty(restorePreview); renderBoxes(); if(restorePreview) renderProposalPreview(); draw();
 }
-$("connectAssistant").onclick=()=>{ closeAssistantDialog(); $("assistantDialogTitle").textContent="Connect assistant"; $("assistantConnectError").hidden=true; $("assistantDialog").showModal(); $("assistantName").focus(); };
+$("startAssistant").onclick=controlAssistant;
+$("connectAssistant").onclick=()=>{ if(assistantAction || !assistantsAvailable || manifest?.status!=="complete") return; closeAssistantDialog(); $("assistantDialogTitle").textContent="Connect assistant"; $("assistantConnectError").hidden=true; $("assistantDialog").showModal(); $("assistantName").focus(); };
 $("assistantForm").onsubmit=createAssistant; $("closeAssistant").onclick=closeAssistantDialog;
 $("assistantDialog").addEventListener("cancel",event=>{ event.preventDefault(); closeAssistantDialog(); });
 $("copyAssistantConfig").onclick=()=>copyAssistant("assistantConfig"); $("copyAssistantInstructions").onclick=()=>copyAssistant("assistantInstructions");

@@ -6,6 +6,7 @@ import queue
 import subprocess
 import threading
 from types import SimpleNamespace
+from assistant_loop import ProviderSessionEnded
 
 
 class PersistentCLI:
@@ -33,7 +34,9 @@ class PersistentCLI:
                     raise ValueError('Invalid Antigravity stream event')
                 if event.get('event')=='result':
                     self.events.put(('result',event.get('result')))
-        except (ValueError,OSError) as error:
+        except OSError:
+            self.events.put(('eof',None))
+        except ValueError as error:
             self.events.put(('error',str(error)))
         finally:
             self.events.put(('eof',None))
@@ -50,7 +53,7 @@ class PersistentCLI:
 
     def __call__(self,command,*,cwd,timeout,**kwargs):
         if self.closed:
-            raise ValueError('Antigravity session has ended; start a new approved run')
+            raise ProviderSessionEnded('The Antigravity CLI session ended')
         arguments=list(command)
         prompt_index=arguments.index('--print')
         if prompt_index!=len(arguments)-2:
@@ -72,7 +75,7 @@ class PersistentCLI:
                 reader.start()
         if self.process.poll() is not None:
             self.close()
-            raise ValueError('Antigravity session exited; no additional launch was requested')
+            raise ProviderSessionEnded('The Antigravity CLI session exited')
         self.inflight=True
         self.errors.clear()
         def send():
@@ -80,12 +83,14 @@ class PersistentCLI:
                 self.process.stdin.write(json.dumps(dict(event='user',message=dict(content=prompt)),allow_nan=False)+'\n')
                 self.process.stdin.flush()
             except (ValueError,OSError) as error:
-                self.events.put(('error',str(error)))
+                self.events.put(('eof',None))
         threading.Thread(target=send,daemon=True).start()
         try:
             event,value=self.events.get(timeout=timeout)
+            if event=='eof':
+                raise ProviderSessionEnded('Antigravity session ended without a valid result')
             if event!='result' or not isinstance(value,dict):
-                raise ValueError('Antigravity session ended without a valid result' if event=='eof' else 'Invalid Antigravity stream result')
+                raise ValueError('Invalid Antigravity stream result')
             usage=value.get('usage') or {}
             count=usage.get('total_tokens',0) if isinstance(usage,dict) else 0
             if type(count) is not int or count<0:
