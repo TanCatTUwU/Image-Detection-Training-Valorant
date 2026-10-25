@@ -22,6 +22,9 @@ class QuotaExhausted(ValueError):
 class ProviderUnavailable(ValueError):
     pass
 
+class ProviderTemporaryError(ProviderUnavailable):
+    pass
+
 
 def quota_exhausted(status, model):
     usage = status.get('connection', {}).get('usage') or {}
@@ -78,6 +81,7 @@ def run_continuously(client, runner, cache_root, *, process_batch, batch_size=4,
         result['errors'] = (result['errors'] + batch.get('errors', []))[-10:]
     from model_registry import file_lock
     with file_lock(cache / 'bridge.lock', timeout=.1):
+        provider_retries=0
         try:
             while not stop.is_set():
                 if status.get('connection', {}).get('id') != connection:
@@ -86,7 +90,18 @@ def run_continuously(client, runner, cache_root, *, process_batch, batch_size=4,
                     result['state'] = 'quota_exhausted'
                     break
                 if status.get('recording_status', 'complete') == 'complete':
-                    batch = process_batch(client, runner, root, frame_limit=batch_size, cursor=cursor, status=status,batch_size=batch_size)
+                    try:
+                        batch = process_batch(client, runner, root, frame_limit=batch_size, cursor=cursor, status=status,batch_size=batch_size)
+                    except ProviderTemporaryError as error:
+                        if provider_retries>=5:
+                            raise
+                        merge(getattr(error,'summary',{}))
+                        if stop.wait(min(2**provider_retries,8)):
+                            break
+                        provider_retries+=1
+                        status=client.request('/status')
+                        continue
+                    provider_retries=0
                     merge(batch)
                     next_cursor = batch.get('next_cursor')
                     cursor = next_cursor if next_cursor is not None else 0
@@ -95,13 +110,15 @@ def run_continuously(client, runner, cache_root, *, process_batch, batch_size=4,
                     idle = not batch.get('processed') or (not batch.get('completed') and next_cursor is None)
                 else:
                     idle = True
-                if idle and stop.wait(idle_seconds):
+                if stop.is_set() or idle and stop.wait(idle_seconds):
                     break
                 status = client.request('/status')
         except (QuotaExhausted, ServerUnavailable, ProviderUnavailable) as error:
             merge(getattr(error, 'summary', {}))
             result['state'] = 'quota_exhausted' if isinstance(error,QuotaExhausted) else 'server_unavailable' if isinstance(error,ServerUnavailable) else 'provider_unavailable'
             result['message'] = str(error)
+            if isinstance(error,ProviderTemporaryError) and provider_retries>=5:
+                result['message']+=' after five automatic retries'
         except AssistantRequestError as error:
             if error.status not in (401, 403, 404, 410):
                 raise

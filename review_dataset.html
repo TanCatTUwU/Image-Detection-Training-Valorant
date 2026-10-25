@@ -656,9 +656,9 @@ function assistantStatus(value) {
 function assistantInstructionsFor(provider) {
   return provider==="antigravity"?`Goal: Review pending frames in this connected recording and add only clearly visible missing Head / Body boxes. Leave boxes pending for human review.
 
-Plan: Run the bridge once. It downloads full-resolution images, reviews four images per Antigravity session, submits dashed additions, updates progress after every batch, then continues automatically. When no eligible frames remain, it waits 10 seconds and checks again without making model calls.
+Plan: Approve and start the bridge once for this recording. One headless Antigravity session stays open across all four-frame batches. It downloads full-resolution images, submits dashed additions, updates progress after every batch, then continues automatically. Do not request approval for each frame, batch, model call, retry or progress update. When no eligible frames remain, it waits 10 seconds and checks again without making model calls.
 
-Allowed work: The existing scoped connection permits reading pending frame images and submitting annotations/progress for this recording. The bridge writes only its local cache. Do not approve or reject frames, train or switch models, edit project code, broaden access, disable permissions, or create other tasks. Repeated batches stay within this same requested scope; no new implementation plan is needed for each frame.
+Allowed work: The existing scoped connection permits reading pending frame images and submitting annotations/progress for this recording. The bridge writes only its local cache. Do not approve or reject frames, train or switch models, edit project code, broaden access, disable permissions, or create other tasks. The initial approval covers repeated batches in this same recording. Model and local API calls continue internally without separate approval. Do not ask permission again within this scope. If existing access is insufficient, stop with a clear error; never expand access or bypass a security check.
 
 Save the copied configuration as assistant-connection.json beside assistant_bridge.py.
 
@@ -670,9 +670,9 @@ python assistant_bridge.py --connection-file assistant-connection.json
 
 The default model is gemini-3.8-flash-low for faster review. Use --model gemini-3.8-flash-medium for more reasoning. All additions still require human review.
 
-Optional: --batch-size 1..8 changes images per session. --once reviews one batch; --frames 4 limits a test run to four frames.
+Optional: --batch-size 1..8 changes images per batch within the same session. --once reviews one batch; --frames 4 limits a test run to four frames.
 
-Stop conditions: Provider quota is exhausted, access is revoked, or the server remains unavailable after the initial attempt plus at least five retries with backoff. Invalid sign-in, unreadable images or invalid model output stop with a clear error. Ctrl+C stops the bridge; Disconnect on the board revokes its access. Normal sandbox and tool permissions remain enabled.
+Stop conditions: Provider quota is exhausted, access is revoked, or the server remains unavailable after the initial attempt plus at least five retries with backoff. Temporary provider outages also receive five automatic retries in the same session. Invalid sign-in, unreadable images, invalid model output or an ended CLI session stop with a clear error and do not launch approval requests. Ctrl+C stops the bridge; Disconnect on the board revokes its access. Normal sandbox and tool permissions remain enabled.
 
 Head = class 0; Body = class 1. Boxes remain pending for review. Protect the configuration secret. Disconnect here to revoke API access.`:`Use api_base and the X-Assistant-Token header from the copied configuration. Never put the secret in a URL.
 
