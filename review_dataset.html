@@ -53,37 +53,53 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid #4b5564;border-
 .workspace-toggle{display:none}.inspect .proposal-tools{padding:8px 0;background:transparent;gap:7px}.inspect .proposal-tools label{flex-basis:100%}.inspect .proposal-review{margin-top:8px}.inspect .proposal-preview{padding:8px}.inspect .estimate-row{flex-wrap:wrap}.inspect .estimate-actions{width:100%}
 @media(min-width:761px){
   .layout:has(>main.single-frame){height:100dvh;min-height:0}
-  #reviewMain.single-frame{height:100dvh;min-height:0;position:relative;display:flex;flex-direction:column;overflow:hidden;padding:10px 16px}
-  .single-frame .heading{flex-shrink:0;gap:8px;margin-bottom:8px;min-height:34px;align-items:center}
-  .single-frame .heading>div{display:flex;align-items:center;gap:12px;min-width:0;flex:1}
-  .single-frame .heading h1{font-size:17px;white-space:nowrap}
-  .single-frame .meta{margin:0;gap:6px}
+  #reviewMain.single-frame{--review-tools-height:48px;--review-footer-height:44px;height:100dvh;min-height:0;position:relative;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:34px var(--review-tools-height) minmax(0,1fr) var(--review-footer-height);gap:8px;overflow:hidden;padding:10px 16px}
+  .single-frame .heading{grid-row:1;gap:8px;margin:0;min-height:0;align-items:center;overflow:hidden}
+  .single-frame .heading>div{display:flex;align-items:center;gap:12px;min-width:0;flex:1;overflow:hidden}
+  .single-frame .heading h1{font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;max-width:100%}
+  .single-frame .meta{margin:0;gap:6px;flex-wrap:nowrap;white-space:nowrap;overflow:hidden}
+  .single-frame .meta>span{flex-shrink:0}
   .single-frame .heading>#reload{margin-left:0;align-self:center}
   .single-frame .workspace-toggle{display:block;white-space:nowrap}
-  .single-frame .workbench-panel{display:none;position:absolute;z-index:8;top:52px;left:16px;right:16px;max-height:calc(100dvh - 74px);overflow:auto;background:var(--panel);padding:12px;border:1px solid #596474;border-radius:6px;box-shadow:0 10px 30px #0006}
+  .single-frame .workbench-panel{display:none;position:absolute;z-index:8;top:52px;left:16px;right:16px;max-height:calc(100dvh - 70px - var(--review-footer-height));overflow:auto;background:var(--panel);padding:12px;border:1px solid #596474;border-radius:6px;box-shadow:0 10px 30px #0006}
   .single-frame.workbench-open .workbench-panel{display:block}
   .single-frame .workbench-panel>.model-bar{margin-bottom:8px}
   .single-frame .workbench-panel>.job-card{margin-bottom:0}
-  .single-frame #reviewControls{flex-shrink:0;display:flex;flex-wrap:wrap;align-items:center;gap:0;margin-bottom:8px;background:#20242a}
-  .single-frame #reviewControls>.canvas-top,.single-frame #reviewControls>.view-tools{border:0;background:transparent;padding:6px;gap:5px}
-  .single-frame #reviewControls>.canvas-top{flex:1}
-  .single-frame #reviewControls>.view-tools{margin-left:auto}
+  .single-frame #reviewControls{grid-row:2;min-width:0;display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:minmax(0,1fr);align-items:center;margin:0;background:#20242a;overflow:hidden}
+  .single-frame #reviewControls>.canvas-top,.single-frame #reviewControls>.view-tools{min-width:0;flex-wrap:nowrap;border:0;background:transparent;padding:6px;gap:5px}
+  .single-frame #reviewControls>.canvas-top{overflow-x:auto;white-space:nowrap;scrollbar-width:thin}
+  .single-frame #reviewControls>.canvas-top>*{flex-shrink:0}
+  .single-frame #reviewControls>.view-tools{margin-left:0}
   .single-frame .view-tools .nav{margin-left:8px;gap:5px}
   .single-frame .view-tools output{min-width:38px}
-  .single-frame #editor{flex:1;min-height:0;display:block;position:relative}
-  .single-frame #editor>.canvas-card{height:100%;display:flex;flex-direction:column;max-width:none}
-  .single-frame .canvas-stage{flex:1;min-height:0;overflow:hidden;background:var(--bg)}
+  .single-frame #position{min-width:15ch;text-align:right;font-variant-numeric:tabular-nums}
+  .single-frame #editor{grid-row:3;min-height:0;min-width:0;display:grid;grid-template-columns:minmax(0,1fr) 240px;grid-template-rows:minmax(0,1fr);gap:12px;overflow:hidden;position:relative}
+  .single-frame #editor>.canvas-card{grid-column:1;grid-row:1;height:100%;min-height:0;position:relative;display:block;max-width:none;overflow:hidden}
+  .single-frame .canvas-stage{position:absolute;inset:0;min-height:0;display:grid;place-items:center;overflow:hidden;background:var(--bg)}
   .single-frame canvas{width:auto;height:auto;max-width:100%;max-height:100%;flex:none}
   .single-frame .canvas-bottom{display:none}
-  .single-frame .inspect{display:none;position:absolute;z-index:5;top:8px;right:8px;bottom:8px;width:260px;max-width:calc(100% - 16px);overflow:auto;box-shadow:0 5px 20px #0007}
-  .single-frame.boxes-open .inspect{display:block}
+  .single-frame .inspect{grid-column:2;grid-row:1;height:100%;min-height:0;display:block;position:relative;inset:auto;width:auto;max-width:none;overflow:auto;box-shadow:none;overscroll-behavior:contain}
   .single-frame .inspect .boxes{max-height:none}
-  .single-frame .actions{flex-shrink:0;margin-top:8px;padding-top:8px;gap:8px}
-  .single-frame #empty{flex:1;min-height:0;padding:20px}
-  .single-frame #notice,.single-frame #exportResult:not(:empty){position:absolute;z-index:9;left:16px;right:16px;bottom:60px;max-height:30dvh;overflow:auto;background:var(--panel);padding:9px;border:1px solid var(--line);border-radius:4px;margin:0}
+  .single-frame .actions{grid-row:4;position:relative;z-index:10;background:var(--bg);margin:0;padding-top:8px;gap:8px;min-height:0;align-items:center}
+  .single-frame .actions-group{gap:6px}
+  .single-frame .actions button{height:32px;padding:5px 8px;font-size:12px;line-height:18px;white-space:nowrap;flex-shrink:0}
+  .single-frame #approve{width:164px}
+  .single-frame #empty{grid-row:3;min-height:0;padding:20px}
+  .single-frame #notice,.single-frame #exportResult:not(:empty){position:absolute;z-index:9;left:16px;right:16px;bottom:calc(18px + var(--review-footer-height));max-height:30dvh;overflow:auto;background:var(--panel);padding:9px;border:1px solid var(--line);border-radius:4px;margin:0}
   .single-frame #exportResult:empty{display:none}
-  .single-frame #exportHelp{flex-shrink:0;margin:5px 0 0}
+  .single-frame #running{position:absolute;z-index:9;top:52px;left:16px;right:16px;margin:0}
 }
+@media(min-width:761px) and (max-width:1199px){
+  #reviewMain.single-frame{--review-tools-height:96px}
+  .single-frame #reviewControls{grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(2,minmax(0,1fr))}
+  .single-frame #reviewControls>.view-tools{justify-self:end}
+}
+@media(min-width:761px) and (max-width:959px){
+  #reviewMain.single-frame{--review-footer-height:80px}
+  .single-frame .actions{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:32px 32px;gap:6px;align-content:space-between}
+  .single-frame .actions>.actions-group:last-child{justify-content:flex-end}
+}
+
 </style>
 </head>
 <body>
@@ -98,7 +114,7 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid #4b5564;border-
 </section>
 <section id="recordingsPanel" class="sidebar-panel" role="tabpanel" aria-labelledby="recordingsTab" hidden><details class="sidebar-group" data-sidebar-group="recordings" open><summary>Recordings</summary><div class="sidebar-group-content"><div class="recordings-scroll"><p id="recordingUnavailable" class="help">Loading recordings…</p><section id="recordingBar" class="recording-bar" aria-label="Local recordings" hidden><label for="recordingSelect">Recording</label><select id="recordingSelect" size="9" disabled aria-label="Recordings"><option value="">Current recording</option></select><p id="recordingStatus" class="help">Loading recordings…</p><div id="recordingError" class="workbench-error" role="status" hidden></div></section><section id="preparationStatus" class="job-card" aria-label="Video preparation progress" hidden><div class="job-title"><strong id="preparationTitle">Preparing frames</strong><button id="openPreparedRecording" class="small" hidden>Open recording</button></div><div class="lifecycle-buttons"><button id="cancelPreparation" class="small" hidden>Cancel preparation</button><button id="resumePreparation" class="small" hidden>Resume preparation</button></div><p id="preparationMessage"></p><div class="progress"><div id="preparationProgress"></div></div><div id="preparationCounts" class="model-detail"></div><details><summary class="help">Details and log</summary><div id="preparationPath" class="model-detail"></div><pre id="preparationLog" class="job-log"></pre></details></section></div><div class="recording-footer"><button id="browseVideo" class="small" disabled>Browse video…</button><button id="openPreparation" class="small" disabled>Prepare frames…</button><button id="resumeRecording" class="small" hidden>Resume preparation</button><button id="deleteRecording" class="small danger" disabled>Delete recording</button><p id="deleteRecordingReason" class="delete-reason" hidden></p><button id="openDeletedItems" class="small">Deleted items…</button></div></div></details></section>
 <section id="assistancePanel" class="sidebar-panel" role="tabpanel" aria-labelledby="assistanceTab" hidden><section id="assistantPanel" class="assistant-panel" aria-label="Connected assistants"><div class="assistant-actions"><button id="startAssistant" class="primary small" type="button" disabled title="Open Command Prompt and resume this recording">Start Antigravity</button><button id="connectAssistant" class="small" type="button">Manual connect</button></div><p id="assistantLauncherStatus" class="assistant-message" role="status" aria-live="polite" hidden></p><div id="assistantConnections" class="assistant-connections"></div><p id="assistantMessage" class="assistant-message" role="status" aria-live="polite" hidden></p></section></section></aside>
-<main id="reviewMain"><div id="running" class="running" hidden>Preparing frames. Open this recording again when it finishes.</div><div class="heading"><div><h1 id="frameTitle">Loading frames</h1><div id="meta" class="meta"></div></div><button id="toggleWorkbench" class="small workspace-toggle" type="button" aria-expanded="false" aria-controls="workbenchPanel">Models &amp; training</button><button id="toggleBoxes" class="small workspace-toggle" type="button" aria-expanded="false" aria-controls="boxInspector">Boxes</button><button id="reload" class="small">Reload</button></div>
+<main id="reviewMain" class="single-frame"><div id="running" class="running" hidden>Preparing frames. Open this recording again when it finishes.</div><div class="heading"><div><h1 id="frameTitle">Loading frames</h1><div id="meta" class="meta"></div></div><button id="toggleWorkbench" class="small workspace-toggle" type="button" aria-expanded="false" aria-controls="workbenchPanel">Models &amp; training</button><button id="reload" class="small">Reload</button></div>
 <section id="workbenchPanel" class="workbench-panel" aria-label="Model and training controls">
 <section id="modelBar" class="model-bar" aria-label="Models and training"><div class="model-label"><label for="modelSelect">Model</label><select id="modelSelect" disabled><option value="">Loading models…</option></select><span id="activeModelBadge" class="pill" hidden>Default</span></div><button id="browseModel" class="small" type="button" disabled>Browse model…</button><button id="convertModel" class="small" type="button" disabled>Convert model…</button><button id="deleteModel" class="small danger" type="button" disabled>Delete model</button><button id="useModel" class="small" disabled>Use as default</button><button id="downloadOnnx" class="small" disabled>Download .onnx</button><button id="downloadPt" class="small" disabled>Download .pt</button><button id="openTraining" class="small training-open" disabled>Train…</button><p id="workbenchStatus" class="help">Loading models…</p><div id="workbenchError" class="workbench-error" role="status" hidden></div><div id="modelImportStatus" class="model-import-status" role="status" aria-live="polite" hidden><strong id="modelImportState"></strong><span id="modelImportMessage"></span></div></section>
 <section id="trainingStatus" class="job-card" aria-label="Training progress" hidden><div class="job-title"><strong id="jobTitle">Training</strong><div class="lifecycle-buttons"><button id="toggleTrainingData" class="small" type="button" aria-expanded="false" aria-controls="trainingData">Expand training data</button><button id="viewTraining" class="small">View options</button></div></div><div id="trainingData" hidden><p id="jobMessage"></p><div class="progress"><div id="jobProgress"></div></div><div id="trainingMetrics" class="training-metrics"><p id="metricEpoch" class="metric-epoch">No completed epoch metrics yet.</p><div class="metric-summary"><div class="metric-value"><span>Train box loss</span><strong data-metric="train_box_loss">—</strong></div><div class="metric-value"><span>Val box loss</span><strong data-metric="val_box_loss">—</strong></div><div class="metric-value"><span>Val class loss</span><strong data-metric="val_cls_loss">—</strong></div><div class="metric-value"><span>mAP50</span><strong data-metric="map50">—</strong></div><div class="metric-value"><span>Precision</span><strong data-metric="precision">—</strong></div></div><div id="trainingPlots" class="training-plots"><section id="lossPlot" class="training-plot" aria-label="Training and validation loss"></section><section id="qualityPlot" class="training-plot" aria-label="Validation mAP50 and precision"></section></div></div><details id="trainingLogDetails" class="training-log-details" hidden><summary>Training details and log</summary><div id="jobPath" class="model-detail"></div><pre id="jobLog" class="job-log"></pre></details><div id="trainingDownloads" class="actions-group" hidden><button id="downloadTrainedOnnx" class="small">Download .onnx</button><button id="downloadTrainedPt" class="small">Download .pt</button></div></div></section>
@@ -106,7 +122,7 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid #4b5564;border-
 <section id="reviewControls" class="canvas-card review-controls" aria-label="Review tools"><div class="canvas-top"><button id="selectTool" class="active" title="Select, move, resize [V]">Select <kbd>V</kbd></button><button id="drawTool" title="Draw rectangle [D]">Draw <kbd>D</kbd></button><span class="divider"></span><button id="labelsToggle" aria-pressed="false" title="Show box accuracy, assistance and review notes">Info</button><button id="undo" title="Undo [Ctrl+Z]">Undo</button><button id="delete" title="Delete selected box [Delete]">Delete</button><span id="dirty" class="dirty" hidden>Unsaved</span><span class="divider"></span><label for="gridSize">View</label><select id="gridSize" aria-label="Frames per view"><option value="1">1 frame</option><option value="4">4 frames</option><option value="9">9 frames</option></select></div><div class="view-tools" aria-label="Image view controls"><button id="zoomOut" aria-label="Zoom out">−</button><output id="zoomLevel" aria-live="polite" aria-label="Image zoom">100%</output><button id="zoomIn" aria-label="Zoom in">+</button><button id="zoomReset" title="Fit the complete image">Fit</button><div id="frameNavigation" class="nav"><span id="position" class="muted" style="font-size:12px"></span><button id="previous" title="Previous frame [←]" aria-label="Previous frame">←</button><button id="next" title="Next frame [→]" aria-label="Next frame">→</button></div><div id="gridNavigation" class="nav" hidden><span id="gridPosition" class="muted"></span><button id="gridPrevious" aria-label="Previous grid page">←</button><button id="gridNext" aria-label="Next grid page">→</button></div></div><div id="gridReviewTools" class="grid-review-tools" role="group" aria-label="Review frames on this page" hidden><output id="gridSelectionCount" aria-live="polite" title="Ctrl-click frames to toggle selection. A normal click opens a frame.">0 selected</output><button id="gridApproveSelected" class="primary" disabled>Approve selected</button><button id="gridRejectSelected" class="danger" disabled>Reject selected</button><span class="divider"></span><button id="gridApproveAll" title="Approve all frames on this page" disabled>Approve all</button><button id="gridRejectAll" class="danger" title="Reject all frames on this page" disabled>Reject all</button></div></section><section id="gridView" aria-label="Frame contact sheet" hidden><div id="gridCards" class="grid-cards"></div></section><div id="editor" class="workspace"><section class="canvas-card"><div class="canvas-stage"><canvas id="canvas" width="640" height="448" tabindex="0" aria-label="640 by 448 video crop. Wheel to zoom. Drag empty space, hold Space, or middle-drag to pan. Alt-click cycles overlapping boxes."></canvas></div><div class="canvas-bottom"><span>640 × 448</span><span id="canvasHint">Select a box</span></div></section>
 <section id="boxInspector" class="inspect"><div><div class="class-tools"><button id="headClass" class="active">Head <kbd>1</kbd></button><button id="bodyClass">Body <kbd>2</kbd></button></div><h2 id="boxCount">0 boxes</h2></div><div id="boxes" class="boxes"></div><div class="selected-controls"><label for="selectedClass" class="muted" style="font-size:11px">Selected box</label><select id="selectedClass" disabled><option value="0">Head</option><option value="1">Body</option></select><div id="coordinates" class="muted" style="font-size:11px">No box selected.</div></div><div class="proposal-tools"><button id="suggestBoxes" disabled>Suggest boxes</button><label for="proposalConfidence">Confidence <input id="proposalConfidence" type="number" min="0.05" max="0.95" step="0.05" value="0.25"></label><label><input id="proposalTiles" type="checkbox" checked> Small-object tiles</label><label class="assist-option"><input id="proposalAssist" type="checkbox" checked> Recover missing parts</label></div><div id="proposalPreview" class="proposal-review" hidden><div class="proposal-tools proposal-preview"><span id="proposalSummary"></span><button id="applyProposals" class="small" title="Add model detections only. Review estimates individually below.">Merge unique boxes</button><button id="discardProposals" class="small">Discard preview</button></div><ul id="proposalWarnings" class="proposal-warnings" hidden></ul><p id="estimateHelp" class="estimate-help" hidden>Amber ? boxes are estimates. Review each before use.</p><div id="proposalEstimates" class="estimate-list" hidden></div></div></section></div>
 <div id="empty" class="empty" hidden><strong>No frames in this view</strong>Choose another filter to continue.</div>
-<div class="actions"><div class="actions-group"><button id="reject" class="danger">Reject frame</button><button id="save">Save pending</button><button id="restorePending" hidden>Restore to pending</button></div><div class="actions-group"><button id="export" title="Export approved frames and rejected background frames from this recording">Export reviewed</button><button id="approve" class="primary">Approve & next</button></div></div><div id="exportHelp" class="help" hidden>Save changes before exporting. Saved approved frames and rejected background frames are included.</div><div id="notice" class="notice" role="status" aria-live="polite" hidden></div><div id="exportResult" class="export-result"></div>
+<div class="actions"><div class="actions-group"><button id="reject" class="danger">Reject frame</button><button id="save">Save pending</button><button id="restorePending" hidden>Restore to pending</button></div><div class="actions-group"><button id="export" title="Export approved frames and rejected background frames from this recording">Export reviewed</button><button id="approve" class="primary">Approve & next</button></div></div><div id="notice" class="notice" role="status" aria-live="polite" hidden></div><div id="exportResult" class="export-result"></div>
 </main></div>
 <dialog id="deleteDialog" aria-labelledby="deleteTitle"><h2 id="deleteTitle">Delete item?</h2><strong id="deleteTarget"></strong><p id="deleteDescription"></p><p id="deleteGuard" class="delete-guard" role="status" hidden></p><div id="deleteError" class="workbench-error" role="alert" hidden></div><div class="actions-group"><button id="cancelDelete" type="button">Keep item</button><button id="confirmDelete" class="danger" type="button">Delete</button></div></dialog>
 <dialog id="deletedItemsDialog" class="deleted-items-dialog" aria-labelledby="deletedItemsTitle"><div class="dialog-title"><h2 id="deletedItemsTitle">Deleted items</h2><button id="closeDeletedItems" class="small" type="button">Close</button></div><p>Restore models and prepared recordings to their original locations.</p><p id="deletedItemsMessage" role="status" aria-live="polite"></p><div id="deletedItemsError" class="workbench-error" role="alert" hidden></div><div id="deletedItemsList" class="deleted-list"></div></dialog>
@@ -240,7 +256,7 @@ function updateButtons() {
   $("delete").disabled = !editable || selected < 0;
   $("selectedClass").disabled = !editable || selected < 0;
   $("export").disabled = busy || dirty || !manifest || manifest.status !== "complete";
-  $("exportHelp").hidden = !dirty;
+  $("export").title=dirty?"Save changes before exporting":"Export approved frames and rejected background frames from this recording";
   $("filter").disabled = busy; $("reload").disabled = busy;
   const list = visibleFrames(), index = list.findIndex(item => item.id === currentId);
   $("previous").disabled = busy || index <= 0; $("next").disabled = busy || index < 0 || index >= list.length - 1;
@@ -426,10 +442,9 @@ function resizeReviewCanvas() {
   if(canvas.style.width!==width) canvas.style.width=width;
   if(canvas.style.height!==height) canvas.style.height=height;
 }
-function setWorkspacePanel(name,open) {
-  const boxesPanel=name==="boxes";
-  $("reviewMain").classList.toggle(boxesPanel?"boxes-open":"workbench-open",open);
-  $(boxesPanel?"toggleBoxes":"toggleWorkbench").setAttribute("aria-expanded",String(open));
+function setWorkbenchOpen(open) {
+  $("reviewMain").classList.toggle("workbench-open",open);
+  $("toggleWorkbench").setAttribute("aria-expanded",String(open));
 }
 function renderGrid() {
   $("reviewMain").classList.toggle("single-frame",gridSize===1);
@@ -536,7 +551,6 @@ function renderGridInfo() {
   }
 }
 function renderBoxes() {
-  setText($("toggleBoxes"),`Boxes (${boxes.length})`);
   setText($("boxCount"),`${boxes.length} ${boxes.length === 1 ? "box" : "boxes"}`);
   while(boxRows.length>boxes.length) boxRows.pop().button.remove();
   const added=document.createDocumentFragment();
@@ -1644,10 +1658,9 @@ function undo() {
   if(restorePreview) proposal=state.proposal;
   setDirty(restorePreview); renderBoxes(); if(restorePreview) renderProposalPreview(); draw();
 }
-$("toggleWorkbench").onclick=()=>setWorkspacePanel("workbench",!$("reviewMain").classList.contains("workbench-open"));
-$("toggleBoxes").onclick=()=>setWorkspacePanel("boxes",!$("reviewMain").classList.contains("boxes-open"));
-document.addEventListener("pointerdown",event=>{ if(!$("workbenchPanel").contains(event.target) && !$("toggleWorkbench").contains(event.target)) setWorkspacePanel("workbench",false); });
-document.addEventListener("keydown",event=>{ if(event.key==="Escape" && !document.querySelector("dialog[open]")) { setWorkspacePanel("workbench",false); setWorkspacePanel("boxes",false); } });
+$("toggleWorkbench").onclick=()=>setWorkbenchOpen(!$("reviewMain").classList.contains("workbench-open"));
+document.addEventListener("pointerdown",event=>{ if(!$("workbenchPanel").contains(event.target) && !$("toggleWorkbench").contains(event.target)) setWorkbenchOpen(false); });
+document.addEventListener("keydown",event=>{ if(event.key==="Escape" && !document.querySelector("dialog[open]")) setWorkbenchOpen(false); });
 const reviewCanvasObserver=new ResizeObserver(resizeReviewCanvas); reviewCanvasObserver.observe(canvas.parentElement);
 window.addEventListener("resize",resizeReviewCanvas);
 $("startAssistant").onclick=controlAssistant;
