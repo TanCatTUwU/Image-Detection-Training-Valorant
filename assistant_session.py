@@ -20,6 +20,7 @@ class PersistentCLI:
         self.closed=False
         self.inflight=False
         self.readers=[]
+        self.call_lock=threading.Lock()
 
     def _read_output(self):
         try:
@@ -52,6 +53,14 @@ class PersistentCLI:
             pass
 
     def __call__(self,command,*,cwd,timeout,**kwargs):
+        if not self.call_lock.acquire(blocking=False):
+            raise ValueError('The Antigravity CLI is already reviewing a batch')
+        try:
+            return self._review(command,cwd=cwd,timeout=timeout,**kwargs)
+        finally:
+            self.call_lock.release()
+
+    def _review(self,command,*,cwd,timeout,**kwargs):
         if self.closed:
             raise ProviderSessionEnded('The Antigravity CLI session ended')
         arguments=list(command)

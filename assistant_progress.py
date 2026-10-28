@@ -153,34 +153,63 @@ class ProgressStore:
 
     def recording_completed(self, recording_id, provider):
         with self.transaction() as database:
-            return {row['frame_id']:row['revision'] for row in database.execute('''
-                SELECT progress.frame_id,MAX(progress.completed_revision) AS revision FROM frame_progress AS progress
-                JOIN progress_scopes AS scope ON progress.connection_id=scope.connection_id
-                WHERE scope.recording_id=? AND scope.provider=? AND progress.ever_completed=1 GROUP BY progress.frame_id''',(recording_id,provider))}
+            return self._recording_completed(database, recording_id, provider)
+
+    @staticmethod
+    def _recording_completed(database, recording_id, provider):
+        return {row['frame_id']:row['revision'] for row in database.execute('''
+            SELECT progress.frame_id,MAX(progress.completed_revision) AS revision FROM frame_progress AS progress
+            JOIN progress_scopes AS scope ON progress.connection_id=scope.connection_id
+            WHERE scope.recording_id=? AND scope.provider=? AND progress.ever_completed=1 GROUP BY progress.frame_id''',(recording_id,provider))}
 
     def recording_last(self, recording_id, provider):
         with self.transaction() as database:
-            row=database.execute('''SELECT progress.last_completed_frame FROM connection_progress AS progress
-                JOIN progress_scopes AS scope ON progress.connection_id=scope.connection_id
-                WHERE scope.recording_id=? AND scope.provider=? AND progress.last_completed_frame IS NOT NULL
-                ORDER BY progress.updated_at DESC,scope.connection_id DESC LIMIT 1''',(recording_id,provider)).fetchone()
-            return row['last_completed_frame'] if row else None
+            return self._recording_last(database, recording_id, provider)
+
+    @staticmethod
+    def _recording_last(database, recording_id, provider):
+        row=database.execute('''SELECT progress.last_completed_frame FROM connection_progress AS progress
+            JOIN progress_scopes AS scope ON progress.connection_id=scope.connection_id
+            WHERE scope.recording_id=? AND scope.provider=? AND progress.last_completed_frame IS NOT NULL
+            ORDER BY progress.updated_at DESC,scope.connection_id DESC LIMIT 1''',(recording_id,provider)).fetchone()
+        return row['last_completed_frame'] if row else None
 
     def snapshot(self, connection_id, frames):
-        with self.transaction() as database:
-            connection = database.execute('SELECT * FROM connection_progress WHERE connection_id=?', (connection_id,)).fetchone()
-            counts = database.execute('SELECT COALESCE(SUM(ever_completed),0),COALESCE(SUM(ever_failed),0) FROM frame_progress WHERE connection_id=?', (connection_id,)).fetchone()
-            batch = self.batch(database, connection_id, connection['batch_id']) if connection and connection['batch_id'] else None
-            result = dict(state='idle', current_frames=[], last_completed_frame=connection['last_completed_frame'] if connection else None,
-                          processed=counts[0], failed=counts[1], batch_id=batch['batch_id'] if batch else None,
-                          batch_total=batch['total'] if batch else 0, batch_completed=0, batch_failed=0,
-                          updated_at=connection['updated_at'] if connection else None)
-            if batch:
-                result['batch_completed'] = sum(item['state'] == 'completed' for item in batch['items'].values())
-                result['batch_failed'] = sum(item['state'] == 'failed' for item in batch['items'].values())
-                for fid, item in batch['items'].items():
-                    frame = frames.get(fid)
-                    if item['state'] == 'processing' and frame and frame['status'] == 'pending' and frame['revision'] in (item['revision'], item.get('completed_revision')):
-                        result['current_frames'].append(dict(frame_id=fid, revision=item['revision'], started_at=item['started_at']))
-                result['state'] = 'failed' if batch['finished'] and (result['batch_failed'] or any(item['state'] == 'processing' for item in batch['items'].values())) else ('completed' if batch['finished'] else 'processing')
+        return self.snapshot_many([connection_id], frames)['snapshots'][connection_id]
+
+    def snapshot_many(self, connection_ids, frames, *, recording_scope=None):
+        connection_ids = tuple(dict.fromkeys(connection_ids))
+        result = dict(snapshots={}, completed={}, last_completed_frame=None)
+        if not connection_ids:
             return result
+        placeholders = ','.join('?' for _ in connection_ids)
+        with self.transaction() as database:
+            connections = {row['connection_id']: row for row in database.execute(f'SELECT * FROM connection_progress WHERE connection_id IN ({placeholders})', connection_ids)}
+            counts = {row['connection_id']: (row['processed'], row['failed']) for row in database.execute(f'''SELECT connection_id,COALESCE(SUM(ever_completed),0) AS processed,COALESCE(SUM(ever_failed),0) AS failed
+                FROM frame_progress WHERE connection_id IN ({placeholders}) GROUP BY connection_id''', connection_ids)}
+            batches = {}
+            for row in database.execute(f'''SELECT batch.* FROM batches AS batch JOIN connection_progress AS progress
+                ON batch.connection_id=progress.connection_id AND batch.batch_id=progress.batch_id
+                WHERE progress.connection_id IN ({placeholders})''', connection_ids):
+                batches[row['connection_id']] = {**dict(row), 'items': json.loads(row['items'])}
+            result['snapshots'] = {connection_id: self._snapshot(connections.get(connection_id), counts.get(connection_id, (0, 0)), batches.get(connection_id), frames) for connection_id in connection_ids}
+            if recording_scope is not None:
+                result['completed'] = self._recording_completed(database, *recording_scope)
+                result['last_completed_frame'] = self._recording_last(database, *recording_scope)
+        return result
+
+    @staticmethod
+    def _snapshot(connection, counts, batch, frames):
+        result = dict(state='idle', current_frames=[], last_completed_frame=connection['last_completed_frame'] if connection else None,
+                      processed=counts[0], failed=counts[1], batch_id=batch['batch_id'] if batch else None,
+                      batch_total=batch['total'] if batch else 0, batch_completed=0, batch_failed=0,
+                      updated_at=connection['updated_at'] if connection else None)
+        if batch:
+            result['batch_completed'] = sum(item['state'] == 'completed' for item in batch['items'].values())
+            result['batch_failed'] = sum(item['state'] == 'failed' for item in batch['items'].values())
+            for fid, item in batch['items'].items():
+                frame = frames.get(fid)
+                if item['state'] == 'processing' and frame and frame['status'] == 'pending' and frame['revision'] in (item['revision'], item.get('completed_revision')):
+                    result['current_frames'].append(dict(frame_id=fid, revision=item['revision'], started_at=item['started_at']))
+            result['state'] = 'failed' if batch['finished'] and (result['batch_failed'] or any(item['state'] == 'processing' for item in batch['items'].values())) else ('completed' if batch['finished'] else 'processing')
+        return result

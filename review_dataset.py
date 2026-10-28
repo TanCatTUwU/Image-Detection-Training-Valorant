@@ -51,6 +51,8 @@ def validate_boxes(boxes):
             clean['score'] = score
         if 'assistant' in box:
             clean['assistant'] = validate_assistant(box['assistant'])
+        if 'assistant_edit' in box:
+            clean['assistant_edit'] = validate_assistant(box['assistant_edit'])
         result.append(clean)
     return result
 
@@ -255,9 +257,27 @@ class ReviewStore:
                 raise
             return copy.deepcopy(frame)
 
-    def merge_assistant(self, frame_id, revision, boxes, request_key, fingerprint):
+    def merge_assistant(self, frame_id, revision, boxes, request_key, fingerprint, *, edits=None, authorize=None):
         boxes = validate_boxes(boxes)
+        if edits is None:
+            edits = []
+        if not isinstance(edits, list) or len(boxes) + len(edits) > 128:
+            raise ValueError('Assistant boxes and edits accept at most 128 total rectangles')
+        clean_edits, targets = [], set()
+        for edit in edits:
+            if not isinstance(edit, dict) or set(edit) - {'box_index', 'class_id', 'x1', 'y1', 'x2', 'y2', 'score', 'assistant_edit'}:
+                raise ValueError('Assistant edits require a box_index and replacement rectangle')
+            target = edit.get('box_index')
+            if type(target) is not int or target < 0 or target in targets:
+                raise ValueError('Each assistant edit requires a unique non-negative integer box_index')
+            replacement = validate_boxes([{key: value for key, value in edit.items() if key != 'box_index'}])[0]
+            if 'assistant_edit' not in replacement:
+                raise ValueError('Assistant edits require authenticated edit provenance')
+            clean_edits.append((target, replacement))
+            targets.add(target)
         with self._locked():
+            if authorize is not None:
+                authorize()
             snapshot = self._manifest_snapshot(clone=False)
             self._complete(snapshot)
             receipts = snapshot.get('assistant_receipts', {})
@@ -267,12 +287,19 @@ class ReviewStore:
             if receipt is not None:
                 if receipt['fingerprint'] != fingerprint:
                     raise RevisionConflict('This assistant request already has a different payload')
-                return dict(state='applied', added=receipt['added'], duplicate=receipt['duplicate'], frame=copy.deepcopy(self._frame(snapshot, receipt['frame_id'])))
+                return dict(state='applied', added=receipt['added'], edited=receipt.get('edited', 0), duplicate=receipt['duplicate'], applied_revision=receipt.get('applied_revision', revision + int(receipt['added'] > 0 or receipt.get('edited', 0) > 0)), frame=copy.deepcopy(self._frame(snapshot, receipt['frame_id'])))
             data, frame = self._writable_frame(frame_id)
             if frame['status'] != 'pending' or frame['revision'] != revision:
                 raise RevisionConflict('This pending frame changed. Reload it before submitting boxes.')
             merged = list(frame['boxes'])
-            added = duplicate = 0
+            added = edited = duplicate = 0
+            for target, replacement in clean_edits:
+                if target >= len(frame['boxes']):
+                    raise ValueError('Assistant edit box_index does not target an existing box')
+                old = merged[target]
+                if any(old.get(key) != value for key, value in replacement.items() if key != 'assistant_edit'):
+                    merged[target] = {**old, **replacement}
+                    edited += 1
             for box in boxes:
                 found = False
                 for old in merged:
@@ -292,26 +319,27 @@ class ReviewStore:
                     added += 1
             if len(merged) > 4096 or len(receipts) >= 4096:
                 raise ValueError('This recording has reached its annotation or assistant request limit')
-            if added:
+            changed = bool(added or edited)
+            if changed:
                 frame.update(boxes=merged, empty_confirmed=False, revision=revision + 1)
-            data['assistant_receipts'] = {**receipts, request_key: dict(fingerprint=fingerprint, frame_id=frame_id, added=added, duplicate=duplicate)}
+            data['assistant_receipts'] = {**receipts, request_key: dict(fingerprint=fingerprint, frame_id=frame_id, added=added, edited=edited, duplicate=duplicate, applied_revision=frame['revision'])}
             label = self._path(frame['label'])
             if not label.parent.is_dir():
                 raise ValueError("The run's draft-labels directory is missing")
             old_label = label.read_bytes() if label.exists() else None
-            if added:
+            if changed:
                 atomic_write(label, yolo_text(merged).encode('utf-8'))
             try:
                 signature = atomic_write(self._path('manifest.json'), (json.dumps(data, separators=(',', ':'), ensure_ascii=False, allow_nan=False) + '\n').encode('utf-8'))
                 self._cache_committed_manifest(data, signature)
             except Exception:
-                if added:
+                if changed:
                     if old_label is None:
                         label.unlink(missing_ok=True)
                     else:
                         atomic_write(label, old_label)
                 raise
-            return dict(state='applied', frame=copy.deepcopy(frame), added=added, duplicate=duplicate)
+            return dict(state='applied', frame=copy.deepcopy(frame), added=added, edited=edited, duplicate=duplicate, applied_revision=frame['revision'])
 
     def review_frames(self, payload):
         if not isinstance(payload, dict) or set(payload) != {'frames', 'status', 'empty_confirmed'}:
@@ -513,6 +541,8 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
     stores_lock = threading.Lock()
     assistants_lock = threading.Lock()
     launcher_lock = threading.Lock()
+    supervisor_stop = threading.Event()
+    supervisor_thread = None
     lifecycle_lock = threading.RLock()
     recording_stores = {store.root: store}
 
@@ -524,11 +554,15 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
             return assistants
 
     def get_launcher():
-        nonlocal assistant_launcher
+        nonlocal assistant_launcher, supervisor_thread
         with launcher_lock:
             if assistant_launcher is None:
                 from assistant_launcher import AssistantLauncher
                 assistant_launcher=AssistantLauncher(PROJECT,get_assistants(),f'http://127.0.0.1:{server.server_port}/api/assistant')
+            supervise = getattr(assistant_launcher, 'supervise', None)
+            if callable(supervise) and supervisor_thread is None and not supervisor_stop.is_set():
+                supervisor_thread = threading.Thread(target=supervise,args=(supervisor_stop,),name='assistant-supervisor',daemon=True)
+                supervisor_thread.start()
             return assistant_launcher
 
     def get_workbench():
@@ -890,13 +924,25 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
 
         def do_OPTIONS(self):
             self._error(405, 'Cross-origin review access is disabled')
-    server = ThreadingHTTPServer(('127.0.0.1', port), Handler)
+    class ManagedReviewServer(ThreadingHTTPServer):
+        def server_close(self):
+            supervisor_stop.set()
+            with launcher_lock:
+                thread = supervisor_thread
+            if thread is not None and thread is not threading.current_thread():
+                thread.join(timeout=6)
+            super().server_close()
+    server = ManagedReviewServer(('127.0.0.1', port), Handler)
     server.daemon_threads = True
     server.review_token = token
     if (PROJECT/'runtime-data'/'assistant-launcher.json').is_file():
         def resume_assistants():
             try:
-                get_launcher().resume()
+                manager = get_launcher()
+                if not callable(getattr(manager,'supervise',None)):
+                    resume = getattr(manager,'resume',None)
+                    if callable(resume):
+                        resume()
             except (ValueError,OSError,RuntimeError):
                 pass
         threading.Thread(target=resume_assistants,daemon=True).start()

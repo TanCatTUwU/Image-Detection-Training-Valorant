@@ -85,7 +85,7 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid #4b5564;border-
   .single-frame .actions button{height:32px;padding:5px 8px;font-size:12px;line-height:18px;white-space:nowrap;flex-shrink:0}
   .single-frame #approve{width:164px}
   .single-frame #empty{grid-row:3;min-height:0;padding:20px}
-  .single-frame #notice,.single-frame #exportResult:not(:empty){position:absolute;z-index:9;left:16px;right:16px;bottom:calc(18px + var(--review-footer-height));max-height:30dvh;overflow:auto;background:var(--panel);padding:9px;border:1px solid var(--line);border-radius:4px;margin:0}
+  .single-frame #exportResult:not(:empty){position:absolute;z-index:9;left:16px;right:16px;bottom:calc(18px + var(--review-footer-height));max-height:30dvh;overflow:auto;background:var(--panel);padding:9px;border:1px solid var(--line);border-radius:4px;margin:0}
   .single-frame #exportResult:empty{display:none}
   .single-frame #running{position:absolute;z-index:9;top:52px;left:16px;right:16px;margin:0}
 }
@@ -100,6 +100,11 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid #4b5564;border-
   .single-frame .actions>.actions-group:last-child{justify-content:flex-end}
 }
 
+
+#notice{position:fixed;z-index:30;left:auto;right:18px;bottom:calc(18px + var(--review-footer-height,44px));width:max-content;max-width:min(420px,calc(100vw - 36px));padding:10px 14px;margin:0;background:#232b35;border:1px solid #536174;border-radius:5px;box-shadow:0 5px 20px #0006;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;pointer-events:none}
+.editing-toast{bottom:104px}
+#notice.error{background:#352326;border-color:#8b575c;color:#f0b5b0}
+.box-row[aria-pressed="true"]{border-color:#91a1b8;background:#2b3441}
 </style>
 </head>
 <body>
@@ -108,7 +113,7 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid #4b5564;border-
 <nav class="sidebar-nav" role="tablist" aria-label="Sidebar sections"><button id="framesTab" type="button" role="tab" aria-controls="framesPanel" aria-selected="true" class="active">Frames</button><button id="recordingsTab" type="button" role="tab" aria-controls="recordingsPanel" aria-selected="false" tabindex="-1">Recordings</button><button id="assistanceTab" type="button" role="tab" aria-controls="assistancePanel" aria-selected="false" tabindex="-1">AI assistance</button></nav>
 <section id="framesPanel" class="sidebar-panel" role="tabpanel" aria-labelledby="framesTab">
 <details class="sidebar-group" data-sidebar-group="progress" open><summary>Review progress</summary><div class="sidebar-group-content"><div id="source" class="source muted">Loading recording…</div><div class="progress"><div id="progressBar"></div></div><div id="progressText" class="muted" style="font-size:11px">—</div><div class="counts"><div><strong id="pendingCount">0</strong><span>Pending</span></div><div><strong id="approvedCount">0</strong><span>Approved</span></div><div><strong id="rejectedCount">0</strong><span>Rejected</span></div><div><strong id="autoRemovedCount">0</strong><span>Auto removed</span></div></div></div></details>
-<details class="sidebar-group" data-sidebar-group="frames" open><summary>Frames</summary><div class="sidebar-group-content"><label for="filter" class="muted" style="font-size:11px">Filter frames</label><select id="filter" class="filter"><option value="pending">Pending</option><option value="all">All frames</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="auto_removed">Auto removed</option></select><button id="rejectAutoRemoved" class="small danger" hidden>Reject all auto removed</button><div id="frameList" class="frame-list"></div></div></details>
+<details class="sidebar-group" data-sidebar-group="frames" open><summary>Frames</summary><div class="sidebar-group-content"><label for="filter" class="muted" style="font-size:11px">Filter frames</label><select id="filter" class="filter" disabled><option value="pending">Pending</option><option value="all">All frames</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="auto_removed">Auto removed</option></select><button id="rejectAutoRemoved" class="small danger" hidden>Reject all auto removed</button><div id="frameList" class="frame-list"></div></div></details>
 <details class="sidebar-group" data-sidebar-group="empty-scan" open><summary>Empty scan</summary><div class="sidebar-group-content"><section class="empty-scan-controls" aria-label="Empty frame scan"><label for="emptyScanConfidence" class="muted" style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;margin-bottom:7px">Confidence<select id="emptyScanConfidence" aria-label="Empty scan confidence" title="Higher thresholds reduce false detections but may miss faint or occluded targets."><option value="0.08">8% · conservative</option><option value="0.25" selected>25% · balanced</option><option value="0.4">40%</option><option value="0.6">60%</option></select></label><button id="startEmptyScan" class="small" disabled title="Checks untouched, unboxed pending frames with the selected model family. Removed frames remain recoverable.">Scan empty frames</button><p id="emptyScanEligibility" class="muted" style="font-size:11px;margin:6px 0" aria-live="polite"></p><div id="emptyScanStatus" hidden><div class="scan-heading"><strong id="emptyScanTitle">Empty scan</strong><button id="cancelEmptyScan" class="small" hidden>Cancel</button></div><p id="emptyScanMessage"></p><div class="progress"><div id="emptyScanProgress"></div></div><div id="emptyScanCounts"></div><div id="emptyScanModel"></div><div id="emptyScanReasons"></div></div><p id="emptyScanError" class="workbench-error" role="status" hidden></p></section></div></details>
 
 </section>
@@ -119,10 +124,10 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid #4b5564;border-
 <section id="modelBar" class="model-bar" aria-label="Models and training"><div class="model-label"><label for="modelSelect">Model</label><select id="modelSelect" disabled><option value="">Loading models…</option></select><span id="activeModelBadge" class="pill" hidden>Default</span></div><button id="browseModel" class="small" type="button" disabled>Browse model…</button><button id="convertModel" class="small" type="button" disabled>Convert model…</button><button id="deleteModel" class="small danger" type="button" disabled>Delete model</button><button id="useModel" class="small" disabled>Use as default</button><button id="downloadOnnx" class="small" disabled>Download .onnx</button><button id="downloadPt" class="small" disabled>Download .pt</button><button id="openTraining" class="small training-open" disabled>Train…</button><p id="workbenchStatus" class="help">Loading models…</p><div id="workbenchError" class="workbench-error" role="status" hidden></div><div id="modelImportStatus" class="model-import-status" role="status" aria-live="polite" hidden><strong id="modelImportState"></strong><span id="modelImportMessage"></span></div></section>
 <section id="trainingStatus" class="job-card" aria-label="Training progress" hidden><div class="job-title"><strong id="jobTitle">Training</strong><div class="lifecycle-buttons"><button id="toggleTrainingData" class="small" type="button" aria-expanded="false" aria-controls="trainingData">Expand training data</button><button id="viewTraining" class="small">View options</button></div></div><div id="trainingData" hidden><p id="jobMessage"></p><div class="progress"><div id="jobProgress"></div></div><div id="trainingMetrics" class="training-metrics"><p id="metricEpoch" class="metric-epoch">No completed epoch metrics yet.</p><div class="metric-summary"><div class="metric-value"><span>Train box loss</span><strong data-metric="train_box_loss">—</strong></div><div class="metric-value"><span>Val box loss</span><strong data-metric="val_box_loss">—</strong></div><div class="metric-value"><span>Val class loss</span><strong data-metric="val_cls_loss">—</strong></div><div class="metric-value"><span>mAP50</span><strong data-metric="map50">—</strong></div><div class="metric-value"><span>Precision</span><strong data-metric="precision">—</strong></div></div><div id="trainingPlots" class="training-plots"><section id="lossPlot" class="training-plot" aria-label="Training and validation loss"></section><section id="qualityPlot" class="training-plot" aria-label="Validation mAP50 and precision"></section></div></div><details id="trainingLogDetails" class="training-log-details" hidden><summary>Training details and log</summary><div id="jobPath" class="model-detail"></div><pre id="jobLog" class="job-log"></pre></details><div id="trainingDownloads" class="actions-group" hidden><button id="downloadTrainedOnnx" class="small">Download .onnx</button><button id="downloadTrainedPt" class="small">Download .pt</button></div></div></section>
 </section>
-<section id="reviewControls" class="canvas-card review-controls" aria-label="Review tools"><div class="canvas-top"><button id="selectTool" class="active" title="Select, move, resize [V]">Select <kbd>V</kbd></button><button id="drawTool" title="Draw rectangle [D]">Draw <kbd>D</kbd></button><span class="divider"></span><button id="labelsToggle" aria-pressed="false" title="Show box accuracy, assistance and review notes">Info</button><button id="undo" title="Undo [Ctrl+Z]">Undo</button><button id="delete" title="Delete selected box [Delete]">Delete</button><span id="dirty" class="dirty" hidden>Unsaved</span><span class="divider"></span><label for="gridSize">View</label><select id="gridSize" aria-label="Frames per view"><option value="1">1 frame</option><option value="4">4 frames</option><option value="9">9 frames</option></select></div><div class="view-tools" aria-label="Image view controls"><button id="zoomOut" aria-label="Zoom out">−</button><output id="zoomLevel" aria-live="polite" aria-label="Image zoom">100%</output><button id="zoomIn" aria-label="Zoom in">+</button><button id="zoomReset" title="Fit the complete image">Fit</button><div id="frameNavigation" class="nav"><span id="position" class="muted" style="font-size:12px"></span><button id="previous" title="Previous frame [←]" aria-label="Previous frame">←</button><button id="next" title="Next frame [→]" aria-label="Next frame">→</button></div><div id="gridNavigation" class="nav" hidden><span id="gridPosition" class="muted"></span><button id="gridPrevious" aria-label="Previous grid page">←</button><button id="gridNext" aria-label="Next grid page">→</button></div></div><div id="gridReviewTools" class="grid-review-tools" role="group" aria-label="Review frames on this page" hidden><output id="gridSelectionCount" aria-live="polite" title="Ctrl-click frames to toggle selection. A normal click opens a frame.">0 selected</output><button id="gridApproveSelected" class="primary" disabled>Approve selected</button><button id="gridRejectSelected" class="danger" disabled>Reject selected</button><span class="divider"></span><button id="gridApproveAll" title="Approve all frames on this page" disabled>Approve all</button><button id="gridRejectAll" class="danger" title="Reject all frames on this page" disabled>Reject all</button></div></section><section id="gridView" aria-label="Frame contact sheet" hidden><div id="gridCards" class="grid-cards"></div></section><div id="editor" class="workspace"><section class="canvas-card"><div class="canvas-stage"><canvas id="canvas" width="640" height="448" tabindex="0" aria-label="640 by 448 video crop. Wheel to zoom. Drag empty space, hold Space, or middle-drag to pan. Alt-click cycles overlapping boxes."></canvas></div><div class="canvas-bottom"><span>640 × 448</span><span id="canvasHint">Select a box</span></div></section>
-<section id="boxInspector" class="inspect"><div><div class="class-tools"><button id="headClass" class="active">Head <kbd>1</kbd></button><button id="bodyClass">Body <kbd>2</kbd></button></div><h2 id="boxCount">0 boxes</h2></div><div id="boxes" class="boxes"></div><div class="selected-controls"><label for="selectedClass" class="muted" style="font-size:11px">Selected box</label><select id="selectedClass" disabled><option value="0">Head</option><option value="1">Body</option></select><div id="coordinates" class="muted" style="font-size:11px">No box selected.</div></div><div class="proposal-tools"><button id="suggestBoxes" disabled>Suggest boxes</button><label for="proposalConfidence">Confidence <input id="proposalConfidence" type="number" min="0.05" max="0.95" step="0.05" value="0.25"></label><label><input id="proposalTiles" type="checkbox" checked> Small-object tiles</label><label class="assist-option"><input id="proposalAssist" type="checkbox" checked> Recover missing parts</label></div><div id="proposalPreview" class="proposal-review" hidden><div class="proposal-tools proposal-preview"><span id="proposalSummary"></span><button id="applyProposals" class="small" title="Add model detections only. Review estimates individually below.">Merge unique boxes</button><button id="discardProposals" class="small">Discard preview</button></div><ul id="proposalWarnings" class="proposal-warnings" hidden></ul><p id="estimateHelp" class="estimate-help" hidden>Amber ? boxes are estimates. Review each before use.</p><div id="proposalEstimates" class="estimate-list" hidden></div></div></section></div>
+<section id="reviewControls" class="canvas-card review-controls" aria-label="Review tools"><div class="canvas-top"><button id="selectTool" class="active" title="Select, move, resize [V]">Select <kbd>V</kbd></button><button id="drawTool" title="Draw rectangle [D]">Draw <kbd>D</kbd></button><span class="divider"></span><button id="labelsToggle" aria-pressed="false" title="Show box accuracy, assistance and review notes">Info</button><button id="undo" title="Undo [Ctrl+Z]">Undo</button><button id="delete" title="Delete selected box [Delete]">Delete</button><span id="dirty" class="dirty" hidden>Unsaved</span><span class="divider"></span><label for="gridSize">View</label><select id="gridSize" aria-label="Frames per view"><option value="1">1 frame</option><option value="4">4 frames</option><option value="9">9 frames</option></select></div><div class="view-tools" aria-label="Image view controls"><button id="zoomOut" aria-label="Zoom out">−</button><output id="zoomLevel" aria-live="polite" aria-label="Image zoom">100%</output><button id="zoomIn" aria-label="Zoom in">+</button><button id="zoomReset" title="Fit the complete image">Fit</button><div id="frameNavigation" class="nav"><span id="position" class="muted" style="font-size:12px"></span><button id="previous" title="Previous frame [←]" aria-label="Previous frame">←</button><button id="next" title="Next frame [→]" aria-label="Next frame">→</button></div><div id="gridNavigation" class="nav" hidden><span id="gridPosition" class="muted"></span><button id="gridPrevious" aria-label="Previous grid page">←</button><button id="gridNext" aria-label="Next grid page">→</button></div></div><div id="gridReviewTools" class="grid-review-tools" role="group" aria-label="Review frames on this page" hidden><output id="gridSelectionCount" aria-live="polite" title="Ctrl-click frames to toggle selection. A normal click opens a frame.">0 selected</output><button id="gridApproveSelected" class="primary" disabled>Approve selected</button><button id="gridRejectSelected" class="danger" disabled>Reject selected</button><span class="divider"></span><button id="gridApproveAll" title="Approve all frames on this page" disabled>Approve all</button><button id="gridRejectAll" class="danger" title="Reject all frames on this page" disabled>Reject all</button></div></section><section id="gridView" aria-label="Frame contact sheet" hidden><div id="gridCards" class="grid-cards"></div></section><div id="editor" class="workspace"><section class="canvas-card"><div class="canvas-stage"><canvas id="canvas" width="640" height="448" tabindex="0" aria-label="640 by 448 video crop. Wheel to zoom. Shift-drag selects boxes; right-click switches Head/Body. Drag empty space or hold Space to pan. Alt-click cycles overlapping boxes."></canvas></div><div class="canvas-bottom"><span>640 × 448</span><span id="canvasHint">Select a box</span></div></section>
+<section id="boxInspector" class="inspect"><div><div class="class-tools"><button id="headClass" class="active">Head <kbd>1</kbd></button><button id="bodyClass">Body <kbd>2</kbd></button></div><h2 id="boxCount">0 boxes</h2></div><div id="boxes" class="boxes"></div><div class="selected-controls"><label for="selectedClass" class="muted" style="font-size:11px">Selection</label><select id="selectedClass" disabled><option value="" disabled>Mixed</option><option value="0">Head</option><option value="1">Body</option></select><div id="coordinates" class="muted" style="font-size:11px">No box selected.</div></div><div class="proposal-tools"><button id="suggestBoxes" disabled>Suggest boxes</button><label for="proposalConfidence">Confidence <input id="proposalConfidence" type="number" min="0.05" max="0.95" step="0.05" value="0.25"></label><label><input id="proposalTiles" type="checkbox" checked> Small-object tiles</label><label class="assist-option"><input id="proposalAssist" type="checkbox" checked> Recover missing parts</label></div><div id="proposalPreview" class="proposal-review" hidden><div class="proposal-tools proposal-preview"><span id="proposalSummary"></span><button id="applyProposals" class="small" title="Add model detections only. Review estimates individually below.">Merge unique boxes</button><button id="discardProposals" class="small">Discard preview</button></div><ul id="proposalWarnings" class="proposal-warnings" hidden></ul><p id="estimateHelp" class="estimate-help" hidden>Amber ? boxes are estimates. Review each before use.</p><div id="proposalEstimates" class="estimate-list" hidden></div></div></section></div>
 <div id="empty" class="empty" hidden><strong>No frames in this view</strong>Choose another filter to continue.</div>
-<div class="actions"><div class="actions-group"><button id="reject" class="danger">Reject frame</button><button id="save">Save pending</button><button id="restorePending" hidden>Restore to pending</button></div><div class="actions-group"><button id="export" title="Export approved frames and rejected background frames from this recording">Export reviewed</button><button id="approve" class="primary">Approve & next</button></div></div><div id="notice" class="notice" role="status" aria-live="polite" hidden></div><div id="exportResult" class="export-result"></div>
+<div class="actions"><div class="actions-group"><button id="reject" class="danger" title="Reject current frame [R]" disabled>Reject frame</button><button id="save" disabled>Save pending</button><button id="restorePending" hidden>Restore to pending</button></div><div class="actions-group"><button id="export" title="Export approved frames and rejected background frames from this recording">Export reviewed</button><button id="approve" class="primary" title="Approve current frame [A]" disabled>Approve & next</button></div></div><div id="notice" class="notice" role="status" aria-live="polite" hidden></div><div id="exportResult" class="export-result"></div>
 </main></div>
 <dialog id="deleteDialog" aria-labelledby="deleteTitle"><h2 id="deleteTitle">Delete item?</h2><strong id="deleteTarget"></strong><p id="deleteDescription"></p><p id="deleteGuard" class="delete-guard" role="status" hidden></p><div id="deleteError" class="workbench-error" role="alert" hidden></div><div class="actions-group"><button id="cancelDelete" type="button">Keep item</button><button id="confirmDelete" class="danger" type="button">Delete</button></div></dialog>
 <dialog id="deletedItemsDialog" class="deleted-items-dialog" aria-labelledby="deletedItemsTitle"><div class="dialog-title"><h2 id="deletedItemsTitle">Deleted items</h2><button id="closeDeletedItems" class="small" type="button">Close</button></div><p>Restore models and prepared recordings to their original locations.</p><p id="deletedItemsMessage" role="status" aria-live="polite"></p><div id="deletedItemsError" class="workbench-error" role="alert" hidden></div><div id="deletedItemsList" class="deleted-list"></div></dialog>
@@ -132,7 +137,7 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid #4b5564;border-
 <dialog id="emptyDialog"><h2>Approve an empty frame?</h2><p id="emptyApprovalHelp">Check that no Head or Body is visible. This records a confirmed empty training example.</p><div class="actions-group"><button id="cancelEmpty">Keep reviewing</button><button id="confirmEmpty" class="primary">Approve empty frame</button></div></dialog>
 <dialog id="preparationDialog" class="prepare-dialog"><div class="dialog-title"><h2>Prepare a recording</h2><button id="closePreparation" class="small" aria-label="Close preparation options">Close</button></div><p>Sample a local video into draft frames.</p><div class="picked-video"><strong id="pickedVideoName">No video selected</strong><div id="pickedVideoPath" class="model-detail"></div><div id="pickedVideoMetadata" class="model-detail"></div></div><button id="browseAnotherVideo" class="small">Browse another video…</button><p id="preparationModel" class="prepare-model" title="Uses the detailed view of the selected model family when available."></p><form id="preparationForm"><div class="training-grid prepare-grid"><label for="prepareSampleFps">Samples per second<input id="prepareSampleFps" name="sample_fps" type="number" min="0.1" max="10" step="0.1" value="1" required></label><label for="prepareMaxImages">Maximum images<input id="prepareMaxImages" name="max_images" type="number" min="2" max="128000" value="600" required></label><label for="prepareConfidence">Confidence<input id="prepareConfidence" name="confidence" type="number" min="0.05" max="0.95" step="0.05" value="0.25" required></label></div><label class="training-toggle"><input id="prepareTiles" name="tiles" type="checkbox" checked><span>Use small-object tiles for distant heads</span></label><p>Draft frames require review and approval before training.</p><div id="preparationError" class="workbench-error" role="alert"></div><div class="actions-group"><button id="startPreparation" class="primary" type="submit">Prepare frames</button></div></form></dialog>
 <dialog id="trainingDialog" class="training-dialog"><div class="dialog-title"><h2>Train Head / Body</h2><button id="closeTraining" class="small" aria-label="Close training options">Close</button></div><p>Choose a local checkpoint from the model library. Starts PowerShell with these settings.</p><form id="trainingForm"><fieldset class="training-recordings"><legend>Recordings for training</legend><div class="training-recordings-head"><p>Include recordings, then optionally hold out whole recordings for validation.</p><button id="clearTrainingRecordings" class="small" type="button">Clear</button></div><div id="trainingRecordings" class="training-recording-list"><p class="help">Loading recordings…</p></div><p id="trainingSourceNote" class="training-selection-status" role="status" aria-live="polite">Select at least one completed recording with reviewed frames.</p><p id="trainingBackgroundNote" class="training-options-note flags" hidden>No background examples. Reject empty scenes to include them as background during training.</p><p class="training-options-note">With no holdouts, keep each recording’s saved train/validation split. Both sets need reviewed frames.</p></fieldset><div class="training-grid"><label class="wide" for="trainCheckpoint">Starting checkpoint<select id="trainCheckpoint" name="checkpoint_id" required></select></label><label for="trainDevice">Device<select id="trainDevice" name="device" required></select></label><label for="trainEpochs">Epochs<input id="trainEpochs" name="epochs" type="number" min="1" max="1000" required></label><label for="trainBatch">Batch size<input id="trainBatch" name="batch" type="number" min="1" max="128" required></label><label for="trainModelWidth">Model width<input id="trainModelWidth" name="model_width" type="number" min="64" max="1280" step="32" required></label><label for="trainModelHeight">Model height<input id="trainModelHeight" name="model_height" type="number" min="64" max="1280" step="32" required></label><label for="trainWorkers">Data workers<input id="trainWorkers" name="workers" type="number" min="0" max="8" required></label><label for="trainThreads">CPU threads<input id="trainThreads" name="threads" type="number" min="1" max="32" required></label><label for="trainName">Run name<input id="trainName" name="name" pattern="[a-z0-9][a-z0-9_-]*" maxlength="48" required></label></div><fieldset class="training-augmentation"><legend>Augmentation and stopping</legend><div class="training-grid"><label for="trainMosaic">Mosaic probability<input id="trainMosaic" name="mosaic" type="number" min="0" max="1" step="0.01" value="0.3" required><small>Combine four training images.</small></label><label for="trainMixup">Mixup probability<input id="trainMixup" name="mixup" type="number" min="0" max="1" step="0.01" value="0" required><small>Blend training images.</small></label><label for="trainDegrees">Rotation ± degrees<input id="trainDegrees" name="degrees" type="number" min="0" max="180" step="0.1" value="0" required></label><label for="trainFliplr">Horizontal flip probability<input id="trainFliplr" name="fliplr" type="number" min="0" max="1" step="0.01" value="0.5" required></label><label for="trainBackgroundRatio">Background samples<input id="trainBackgroundRatio" name="background_ratio" type="number" min="0" max="1" step="0.05" value="0.25" required><small>Extra background crops per positive frame, up to 1. Rejected frames are always included; 0 disables extra crops.</small></label><label for="trainPatience">Early-stop patience<input id="trainPatience" name="patience" type="number" min="0" max="1000" step="1" value="10" required><small>Epochs without improvement; 0 disables.</small></label></div><p class="training-options-note">Early stopping can reduce overfitting; review validation results before using the model.</p></fieldset><p class="training-options-note">Outputs: .pt checkpoint and .onnx model. Width and height must be multiples of 32. ONNX input size is fixed after export; review images stay 640 × 448.</p><label class="training-toggle"><input id="trainAutoActivate" name="auto_activate" type="checkbox" checked title="Applied after a successful export. Training continues if this tab closes."><span>Make the exported model the default</span></label><p class="training-guidance">For training, label every visible living enemy or bot with Head / Body boxes, including in mixed scenes. Leave teammates, dead targets and background unboxed. Reject scenes with no living enemies; rejected frames are included as background examples. Save and approve corrections before starting.</p><div id="trainingError" class="workbench-error" role="alert"></div><div class="actions-group"><button id="startTraining" class="primary" type="submit">Start in PowerShell</button></div></form></dialog>
-<div id="editingToast" class="editing-toast" role="status" aria-live="polite" hidden><div class="toast-heading"><strong>Editing tips</strong><button id="closeEditingToast" type="button" class="small" aria-label="Dismiss editing tips">Dismiss</button></div><p>Drag a box to move it or a handle to resize. Alt-click cycles overlapping boxes; Alt-drag moves the next candidate. Wheel zooms; drag empty space or hold Space to pan.</p></div>
+<div id="editingToast" class="editing-toast" role="status" aria-live="polite" hidden><div class="toast-heading"><strong>Editing tips</strong><button id="closeEditingToast" type="button" class="small" aria-label="Dismiss editing tips">Dismiss</button></div><p>Shift-drag selects boxes; right-click switches Head/Body. A approves and R rejects the current frame or selected grid frames. Left/Right navigates. Wheel zooms; Space pans.</p></div>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -140,6 +145,7 @@ const token = new URLSearchParams(location.search).get("token") || "";
 const canvas = $("canvas"), ctx = canvas.getContext("2d");
 const clone = value => JSON.parse(JSON.stringify(value));
 let manifest = null, currentId = null, frame = null, boxes = [], selected = -1;
+let boxSelection=new Set(), noticeTimer=null, noticeSequence=0;
 let tool = "select", drawClass = 0, history = [], drag = null, image = null, imageURL = null;
 let showLabels = false;
 let view = {scale:1, x:0, y:0}, spacePan = false;
@@ -157,7 +163,7 @@ let gridSelection=new Set(), gridSelectionContext="", pendingGridReview=null, pe
 let emptyScan=null, emptyScanLoading=false, emptyScanAction=false, emptyScanSequence=0, emptyScanAvailable=true;
 let scanManifestPending=false, scanManifestLoading=false, scanMessage="";
 let assistantConnections=[], assistantProviders=["antigravity"], assistantLoaded=false, assistantLoading=false, assistantAction=false, assistantSequence=0, assistantManifestLoading=false, assistantsAvailable=true;
-let assistantLauncher={available:false,session:null};
+let assistantLauncher={available:false,session:null}, assistantLastPoll=0;
 let assistantManifestVersion=null, assistantLastManifestRefresh=0;
 let frameRowFilter="", frameRowScrollRequest=null;
 let frameRowGeneration=-1, frameRowCache=new Map(), frameRowsBusy=null, boxRows=[];
@@ -188,7 +194,12 @@ function showEditingTips() {
   try { if(localStorage.getItem(editingTipsKey)) return; localStorage.setItem(editingTipsKey,"1"); } catch(error) {  }
   $("editingToast").hidden=false; editingTipsTimer=setTimeout(dismissEditingTips,15000);
 }
-function notice(message, error = false) { $("notice").textContent = message; $("notice").hidden=!message; $("notice").classList.toggle("error", error); }
+function notice(message, error = false) {
+  const sequence=++noticeSequence;
+  if(noticeTimer!==null) clearTimeout(noticeTimer); noticeTimer=null;
+  $("notice").textContent=message; $("notice").hidden=!message; $("notice").classList.toggle("error",error);
+  if(message) noticeTimer=setTimeout(()=>{if(sequence===noticeSequence) { $("notice").hidden=true; noticeTimer=null; }},error?9000:3500);
+}
 function setText(node,value) { const text=String(value); if(node.textContent!==text) node.textContent=text; }
 function reviewHeaders(recordingId=selectedRecordingId) {
   const headers = {"X-Review-Token": token};
@@ -472,7 +483,8 @@ function renderGrid() {
       if(![box.x1,box.y1,box.x2,box.y2].every(Number.isFinite)) continue;
       const rect=document.createElementNS("http://www.w3.org/2000/svg","rect");
       for(const [name,value] of Object.entries({x:box.x1*640,y:box.y1*448,width:(box.x2-box.x1)*640,height:(box.y2-box.y1)*448,stroke:colors[box.class_id]||colors[0],fill:colors[box.class_id]||colors[0],"fill-opacity":0.25,"stroke-width":1.5,"vector-effect":"non-scaling-stroke"})) rect.setAttribute(name,String(value));
-      if(box.assistant) rect.setAttribute("stroke-dasharray","4 3");
+      if(box.assistant_edit) { rect.setAttribute("fill",gridStripeFill(overlay,colors[box.class_id]||colors[0],`ai-edit-${item.id}-${(item.boxes||[]).indexOf(box)}`)); rect.setAttribute("fill-opacity","1"); }
+      else if(box.assistant) rect.setAttribute("stroke-dasharray","4 3");
       overlay.append(rect);
     }
     picture.append(img,overlay,loading);
@@ -500,8 +512,32 @@ async function changeGridSize(value) {
   await showFrame(target);
 }
 function setDirty(keepProposal=false) { dirty = !!frame && JSON.stringify(boxes) !== JSON.stringify(frame.boxes); editVersion++; if(keepProposal && proposal) proposal.version=editVersion; else clearProposals(); updateButtons(); }
-function pushHistory(keepProposal=false) { history.push({boxes:clone(boxes), selected, proposal:keepProposal && proposal?clone(proposal):null}); if (history.length > 80) history.shift(); }
-function selectBox(index) { selected = index; renderBoxes(); draw(); updateButtons(); }
+function selectedBoxIndices() {
+  const chosen=[...boxSelection].filter(index=>Number.isInteger(index) && index>=0 && index<boxes.length);
+  if(!chosen.length && selected>=0 && selected<boxes.length) chosen.push(selected);
+  return chosen.sort((a,b)=>a-b);
+}
+function boxIsSelected(index) { return boxSelection.has(index) || (!boxSelection.size && selected===index); }
+function setBoxSelection(indices,active=null) {
+  const valid=[...new Set(indices)].filter(index=>Number.isInteger(index) && index>=0 && index<boxes.length).sort((a,b)=>a-b);
+  boxSelection=new Set(valid); selected=valid.includes(active)?active:valid.at(-1)??-1;
+}
+function marqueeBoxIndices(start,end) {
+  const x1=Math.min(start.x,end.x),y1=Math.min(start.y,end.y),x2=Math.max(start.x,end.x),y2=Math.max(start.y,end.y);
+  return boxes.flatMap((box,index)=>box.x2>x1 && box.x1<x2 && box.y2>y1 && box.y1<y2?[index]:[]);
+}
+function translatedBoxes(items,dx,dy) {
+  if(!items.length) return [];
+  const ax=Math.max(-Math.min(...items.map(box=>box.x1)),Math.min(1-Math.max(...items.map(box=>box.x2)),dx));
+  const ay=Math.max(-Math.min(...items.map(box=>box.y1)),Math.min(1-Math.max(...items.map(box=>box.y2)),dy));
+  return items.map(box=>({...clone(box),x1:box.x1+ax,x2:box.x2+ax,y1:box.y1+ay,y2:box.y2+ay}));
+}
+function pushHistory(keepProposal=false) { history.push({boxes:clone(boxes),selected,selection:selectedBoxIndices(),proposal:keepProposal && proposal?clone(proposal):null}); if(history.length>80) history.shift(); }
+function selectBox(index,additive=false) {
+  if(additive && index>=0) { const chosen=new Set(selectedBoxIndices()); if(chosen.has(index)) chosen.delete(index); else chosen.add(index); setBoxSelection([...chosen],index); }
+  else setBoxSelection(index>=0?[index]:[],index);
+  renderBoxes(); draw(); updateButtons();
+}
 function assistantBrand(assistant) {
   const brands={antigravity:"Antigravity",claude:"Claude",anthropic:"Claude",gemini:"Gemini",openai:"OpenAI",chatgpt:"ChatGPT",copilot:"Copilot",grok:"Grok"};
   const provider=String(assistant?.provider || "").toLowerCase();
@@ -511,7 +547,7 @@ function assistantBrand(assistant) {
   return name.replace(/\s+(?:board\s+session|session|annotation\s+worker)$/i,"") || "AI";
 }
 function boxMetadata(box) {
-  return [Number.isFinite(box.score)?`${Math.round(box.score*100)}% accuracy`:"",box.assistant?`Assisted (${assistantBrand(box.assistant)})`:""].filter(Boolean).join(" · ");
+  return [Number.isFinite(box.score)?`${Math.round(box.score*100)}% accuracy`:"",box.assistant_edit?`Edited by ${assistantBrand(box.assistant_edit)}`:box.assistant?`Assisted (${assistantBrand(box.assistant)})`:""].filter(Boolean).join(" · ");
 }
 function boxReviewText(box, peers=boxes, flags=frame?.flags || []) {
   const notes=[], head=box.class_id===0;
@@ -530,6 +566,16 @@ function boxReviewText(box, peers=boxes, flags=frame?.flags || []) {
   if(flags.includes("low_sharpness")) notes.push("Low sharpness");
   return notes.join(" · ");
 }
+function boxInfoText(box,peers=boxes,flags=frame?.flags || []) {
+  const notes=boxReviewText(box,peers,flags),metadata=boxMetadata(box);
+  return box.assistant_edit?[metadata,notes].filter(Boolean).join(" · "):notes || metadata;
+}
+function gridStripeFill(overlay,color,id) {
+  const defs=document.createElementNS("http://www.w3.org/2000/svg","defs"),pattern=document.createElementNS("http://www.w3.org/2000/svg","pattern"),line=document.createElementNS("http://www.w3.org/2000/svg","path");
+  for(const [key,value] of Object.entries({id,width:8,height:8,patternUnits:"userSpaceOnUse",patternTransform:"rotate(45)"})) pattern.setAttribute(key,String(value));
+  for(const [key,value] of Object.entries({d:"M 0 0 L 0 8",stroke:color,"stroke-width":2,"stroke-opacity":1,fill:"none"})) line.setAttribute(key,String(value));
+  pattern.append(line); defs.append(pattern); overlay.append(defs); return `url(#${id})`;
+}
 function renderGridInfo() {
   const items=new Map(gridPageFrames().map(item=>[item.id,item]));
   for(const card of $("gridCards").children) {
@@ -539,7 +585,7 @@ function renderGridInfo() {
     if(!showLabels) continue;
     for(const box of item.boxes || []) {
       if(![box.x1,box.y1,box.x2,box.y2].every(Number.isFinite)) continue;
-      const notes=boxReviewText(box,item.boxes,Array.isArray(item.flags)?item.flags:[]), label=notes || boxMetadata(box);
+      const notes=boxReviewText(box,item.boxes,Array.isArray(item.flags)?item.flags:[]), label=boxInfoText(box,item.boxes,Array.isArray(item.flags)?item.flags:[]);
       if(!label) continue;
       const group=document.createElementNS("http://www.w3.org/2000/svg","g"), background=document.createElementNS("http://www.w3.org/2000/svg","rect"), text=document.createElementNS("http://www.w3.org/2000/svg","text");
       group.setAttribute("data-box-info","true");
@@ -556,15 +602,19 @@ function renderBoxes() {
   const added=document.createDocumentFragment();
   boxes.forEach((box, index) => {
     let row=boxRows[index];
-    if(!row) { const button=document.createElement("button"),label=document.createElement("span"),score=document.createElement("small"); button.className="box-row"; button.append(label,score); button.onclick=()=>selectBox(index); row={button,label,score,selected:null,classId:null}; boxRows.push(row); added.append(button); }
-    if(row.selected!==(selected===index)) { row.selected=selected===index; row.button.classList.toggle("selected",row.selected); }
+    if(!row) { const button=document.createElement("button"),label=document.createElement("span"),score=document.createElement("small"); button.className="box-row"; button.append(label,score); button.onclick=event=>selectBox(index,event.shiftKey || event.ctrlKey || event.metaKey); row={button,label,score,selected:null,classId:null}; boxRows.push(row); added.append(button); }
+    if(row.selected!==boxIsSelected(index)) { row.selected=boxIsSelected(index); row.button.classList.toggle("selected",row.selected); row.button.setAttribute("aria-pressed",String(row.selected)); }
     setText(row.label,`${index+1} · ${box.class_id===0?"Head":"Body"}`);
     if(row.classId!==box.class_id) { row.classId=box.class_id; row.label.style.color=colors[box.class_id]; }
     setText(row.score,boxMetadata(box));
     row.score.title=boxMetadata(box);
   });
   if(added.childNodes.length) $("boxes").append(added);
-  if (selected >= 0 && boxes[selected]) {
+  const chosen=selectedBoxIndices();
+  if(chosen.length>1) {
+    const classes=new Set(chosen.map(index=>boxes[index].class_id)); $("selectedClass").value=classes.size===1?String(classes.values().next().value):"";
+    setText($("coordinates"),`${chosen.length} boxes selected`);
+  } else if (selected >= 0 && boxes[selected]) {
     const box = boxes[selected]; $("selectedClass").value = String(box.class_id);
     setText($("coordinates"),`${Math.round(box.x1 * 640)}, ${Math.round(box.y1 * 448)} → ${Math.round(box.x2 * 640)}, ${Math.round(box.y2 * 448)} px`);
   } else setText($("coordinates"),"No box selected.");
@@ -573,20 +623,26 @@ function renderBoxes() {
 function setTool(value) { tool = value; $("selectTool").classList.toggle("active", value === "select"); $("drawTool").classList.toggle("active", value === "draw"); updateCursor(); $("canvasHint").textContent = value === "draw" ? `Draw ${drawClass === 0 ? "Head" : "Body"}` : "Select a box"; }
 function setClass(value) { drawClass = value; $("headClass").classList.toggle("active", value === 0); $("bodyClass").classList.toggle("active", value === 1); setTool("draw"); }
 function handles(box) { const mx = (box.x1 + box.x2) / 2, my = (box.y1 + box.y2) / 2; return [[box.x1,box.y1,"nw"],[mx,box.y1,"n"],[box.x2,box.y1,"ne"],[box.x2,my,"e"],[box.x2,box.y2,"se"],[mx,box.y2,"s"],[box.x1,box.y2,"sw"],[box.x1,my,"w"]]; }
+function paintStripes(x,y,w,h,color,unit) {
+  ctx.save(); ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip(); ctx.globalAlpha=1; ctx.strokeStyle=color; ctx.lineWidth=1.6*unit; ctx.setLineDash([]); ctx.beginPath();
+  for(let offset=-h;offset<w;offset+=7*unit) { ctx.moveTo(x+offset,y+h); ctx.lineTo(x+offset+h,y); }
+  ctx.stroke(); ctx.restore();
+}
 function paintBox(box, index, preview = false) {
   const x = box.x1 * 640, y = box.y1 * 448, w = (box.x2 - box.x1) * 640, h = (box.y2 - box.y1) * 448;
   const unit=1/view.scale;
-  ctx.strokeStyle = colors[box.class_id]; ctx.lineWidth = (selected === index ? 2 : 1.3)*unit;
-  ctx.save(); ctx.fillStyle=colors[box.class_id]; ctx.globalAlpha=0.25; ctx.fillRect(x,y,w,h); ctx.restore();
-  if (preview || box.assistant) ctx.setLineDash([4*unit,3*unit]); ctx.strokeRect(x,y,w,h); ctx.setLineDash([]);
+  ctx.strokeStyle = colors[box.class_id]; ctx.lineWidth = (boxIsSelected(index) ? 2 : 1.3)*unit;
+  if(box.assistant_edit) paintStripes(x,y,w,h,colors[box.class_id],unit);
+  else { ctx.save(); ctx.fillStyle=colors[box.class_id]; ctx.globalAlpha=0.25; ctx.fillRect(x,y,w,h); ctx.restore(); }
+  if (preview || box.assistant && !box.assistant_edit) ctx.setLineDash([4*unit,3*unit]); ctx.strokeRect(x,y,w,h); ctx.setLineDash([]);
   if (showLabels) {
-    const notes=boxReviewText(box), label=notes || boxMetadata(box); ctx.font = `${11*unit}px system-ui`;
+    const notes=boxReviewText(box), label=boxInfoText(box); ctx.font = `${11*unit}px system-ui`;
     if(label) {
       const labelWidth = Math.min(640,ctx.measureText(label).width + 8*unit), labelY = y >= 17*unit ? y - 17*unit : y;
       const labelX = Math.max(0,Math.min(x,640-labelWidth)); ctx.fillStyle = notes?"#edc376":colors[box.class_id]; ctx.fillRect(labelX,labelY,labelWidth,16*unit); ctx.fillStyle = "#102018"; ctx.fillText(label,labelX+4*unit,labelY+12*unit,labelWidth-8*unit);
     }
   }
-  if (selected === index && !preview) handles(box).forEach(([hx,hy]) => { ctx.fillStyle = colors[box.class_id]; ctx.fillRect(hx*640-3*unit,hy*448-3*unit,6*unit,6*unit); ctx.strokeStyle = "#14221b"; ctx.lineWidth=unit; ctx.strokeRect(hx*640-3*unit,hy*448-3*unit,6*unit,6*unit); });
+  if (selected === index && selectedBoxIndices().length===1 && !preview) handles(box).forEach(([hx,hy]) => { ctx.fillStyle = colors[box.class_id]; ctx.fillRect(hx*640-3*unit,hy*448-3*unit,6*unit,6*unit); ctx.strokeStyle = "#14221b"; ctx.lineWidth=unit; ctx.strokeRect(hx*640-3*unit,hy*448-3*unit,6*unit,6*unit); });
 }
 function paintEstimate(box) {
   const unit=1/view.scale, x=box.x1*640, y=box.y1*448, w=(box.x2-box.x1)*640, h=(box.y2-box.y1)*448;
@@ -604,6 +660,10 @@ function draw() {
   if(proposal) proposal.boxes.forEach(box => paintBox(box,-2,true));
   if(proposal) proposal.estimates.forEach(paintEstimate);
   if (drag?.kind === "draw") { const p = drag.latest; paintBox({class_id:drawClass,x1:Math.min(drag.start.x,p.x),y1:Math.min(drag.start.y,p.y),x2:Math.max(drag.start.x,p.x),y2:Math.max(drag.start.y,p.y)},boxes.length,true); }
+  if(drag?.kind==="marquee") {
+    const p=drag.latest,unit=1/view.scale,x=Math.min(drag.start.x,p.x)*640,y=Math.min(drag.start.y,p.y)*448,w=Math.abs(p.x-drag.start.x)*640,h=Math.abs(p.y-drag.start.y)*448;
+    ctx.save();ctx.fillStyle="#bfd4f3";ctx.globalAlpha=.12;ctx.fillRect(x,y,w,h);ctx.globalAlpha=1;ctx.strokeStyle="#bfd4f3";ctx.lineWidth=unit;ctx.setLineDash([4*unit,3*unit]);ctx.strokeRect(x,y,w,h);ctx.restore();
+  }
   ctx.restore();
 }
 function discardOkay() { return !dirty || window.confirm("Discard unsaved box corrections for this frame?"); }
@@ -614,7 +674,7 @@ async function showFrame(id) {
   clearProposals(); editVersion++;
   if(id!==currentId) view={scale:1,x:0,y:0};
   frame = frameIndex().byId.get(id) || null; currentId = frame?.id || null;
-  boxes = frame ? clone(frame.boxes) : []; selected=-1; history=[]; dirty=false; image=null; drag=null;
+  boxes = frame ? clone(frame.boxes) : []; setBoxSelection([]); history=[]; dirty=false; image=null; drag=null;
   if(frame?.status==="auto_removed") setTool("select");
   if (imageURL) { URL.revokeObjectURL(imageURL); imageURL=null; }
   $("editor").hidden = !frame || gridSize!==1; $("empty").hidden = !!visibleFrames().length; $("frameTitle").textContent = gridSize!==1?"Frames":frame?.id || "Review queue complete"; $("meta").replaceChildren();
@@ -757,6 +817,12 @@ async function emptyScanCommand(path) {
   } catch(error) { if(generation===recordingSequence) scanMessage=error.message; }
   finally { if(generation===recordingSequence) { emptyScanAction=false; updateEmptyScanControls(); } }
 }
+function pollAssistants() {
+  if(document.hidden) return;
+  const now=Date.now(),interval=$("assistancePanel").hidden?3000:1000;
+  if(now-assistantLastPoll<interval) return;
+  assistantLastPoll=now;refreshAssistants(true);
+}
 function assistantMessage(message="",error=false) {
   $("assistantMessage").textContent=message; $("assistantMessage").hidden=!message; $("assistantMessage").classList.toggle("error",error);
 }
@@ -769,9 +835,12 @@ function assistantStatus(value) {
   return ({connected:"Connected",waiting:"Waiting for bridge",active:"Active",idle:"Waiting for bridge",offline:"Offline",online:"Online",expired:"Access expired",disconnected:"Disconnected",revoked:"Disconnected",error:"Needs attention"})[value] || "Waiting for bridge";
 }
 function assistantInstructionsFor(provider) {
-  return provider==="antigravity"?`Goal: Review pending frames in this connected recording and add only clearly visible missing Head / Body boxes. Leave boxes pending for human review.
+  const targets="Label living enemies and practice bots from visible figure, pose and context. A purple outline supports enemy identity but is not sufficient by itself. Do not label teammates, corpses, guns, smoke, flashes, Iso shields or other effects. For Iso, mark his body/head, not the shield. Annotate visible parts of partially occluded enemies; do not invent boxes for fully hidden targets or uncertain team identity.";
+  return provider==="antigravity"?`Goal: Review pending frames in this connected recording and add missing Head / Body boxes or correct existing boxes using their exact pending revision. Leave all changes pending for human review.
 
-Plan: Click Start Antigravity on the board to open Command Prompt, connect this recording and start processing. Approve the full logical session once. One headless Antigravity session processes all four-frame batches and can reopen its worker after a crash within the same authorization. It downloads full-resolution images, submits dashed additions, updates progress after every batch, then continues automatically. Do not request approval for each frame, batch, model call, retry, worker restart or progress update. When no eligible frames remain, it waits 10 seconds and checks again without making model calls.
+${targets}
+
+Plan: Click Start Antigravity on the board to open Command Prompt, connect this recording and start processing. Approve the full logical session once. One headless Antigravity session processes all four-frame batches and can reopen its worker after a crash within the same authorization. It downloads full-resolution images, submits dashed additions and striped corrections, updates progress after every batch, then continues automatically. Do not request approval for each frame, batch, model call, retry, worker restart or progress update. When no eligible frames remain, it waits 10 seconds and checks again without making model calls.
 
 Allowed work: The existing scoped connection permits reading pending frame images and submitting annotations/progress for this recording. The bridge writes only its local cache. Do not approve or reject frames, train or switch models, edit project code, broaden access, disable permissions, or create other tasks. The initial approval covers the entire logical session across repeated batches and worker restarts in this same recording until Disconnect or token expiry. Model and local API calls continue internally without separate approval. Do not ask permission again within this scope. If existing access is insufficient, stop with a clear error; never expand access or bypass a security check. Sign-in and any new or broader access require human action.
 
@@ -785,19 +854,22 @@ python assistant_bridge.py --connection-file assistant-connection.json --check
 Start continuous processing:
 python assistant_bridge.py --connection-file assistant-connection.json
 
-The default model is gemini-3.8-flash-low for faster review. Use --model gemini-3.8-flash-medium for more reasoning. All additions still require human review.
+The default model is gemini-3.8-flash-low for faster review. Use --model gemini-3.8-flash-medium for more reasoning. All additions and corrections require human review.
 
 Optional: --batch-size 1..8 changes images per batch within the same session. --once reviews one batch; --frames 4 limits a test run to four frames.
 
 Stop conditions: Provider quota is exhausted, access is revoked or expires, or the server remains unavailable after the initial attempt plus at least five retries with backoff. Temporary provider outages also receive five automatic retries in the same session. The automatic launcher can reopen an ended CLI worker with bounded retries under the existing authorization. Invalid sign-in, unreadable images, invalid model output or insufficient access stop with a clear error and do not launch approval requests. Use Pause on the board to pause automatic processing. Ctrl+C stops a manual bridge; Disconnect on the board revokes its access. Normal sandbox and tool permissions remain enabled.
 
-Head = class 0; Body = class 1. Boxes remain pending for review. Protect the configuration secret. Disconnect here to revoke API access.`:`Use api_base and the X-Assistant-Token header from the copied configuration. Never put the secret in a URL.
+Head = class 0; Body = class 1. New AI boxes are dashed; AI-corrected boxes have opaque diagonal stripes and an Edited by brand label. Boxes remain pending for review. Protect the configuration secret. Disconnect here to revoke API access.`:`Use api_base and the X-Assistant-Token header from the copied configuration. Never put the secret in a URL.
+
+${targets}
 
 GET /status to inspect the recording.
 POST /frames with {"limit":4,"cursor":0} to request pending frames only. Never process approved, rejected, or auto-removed frames.
 POST /progress with {"event":"start","batch_id":"batch-1","total":4,"frames":[{"frame_id":"frame-000001","revision":0}]} before processing a frame.
 Download its returned image_url with the same header. If its status or revision changed, skip it and refresh the queue.
 POST /boxes with {"frame_id":"frame-000001","revision":0,"boxes":[{"class_id":0,"x1":0.1,"y1":0.1,"x2":0.2,"y2":0.3}]} using that frame's current revision.
+To correct an existing box, include "edits":[{"box_index":0,"class_id":0,"x1":0.1,"y1":0.1,"x2":0.2,"y2":0.3}] in the same POST /boxes request; "boxes":[] is allowed for edit-only requests. box_index is the zero-based position in the returned frame.boxes at that exact revision. Submit all additions and corrections for one frame in one request. Keep request_id stable when retrying the same payload. Never replace the whole box list, delete annotations, or guess a target after a revision conflict. The server records Edited by provenance and advances the frame revision once when anything changed.
 
 POST /progress with {"event":"complete","batch_id":"batch-1","frames":[{"frame_id":"frame-000001","revision":0}]} after each viewed frame, including frames with no additions. Use the original queue revision. For a batch, list up to 32 completed frames. Report event="fail" with an error for a failed frame, then event="finish" with batch_id when the batch ends. Use a new batch_id for each batch.
 
@@ -810,12 +882,14 @@ function renderAssistantLauncher() {
   if(typeof assistantLauncher==="undefined") return;
   const launcher=assistantLauncher, session=launcher?.session, active=session?.active===true;
   const button=$("startAssistant"), status=$("assistantLauncherStatus");
-  button.textContent=active?"Pause":session?.phase==="paused"?"Resume":"Start Antigravity";
+  const resumable=session?.resumable===true || session?.resumable===undefined && session?.phase==="paused" && session?.authorized!==false;
+  button.textContent=active?"Pause":resumable?"Resume":"Start Antigravity";
+  button.title=active?"Pause this recording; progress is saved":resumable?"Continue this recording with its existing session and saved progress":"Start Antigravity for this recording";
   button.disabled=assistantLaunchBlocked() || !launcher?.available;
   button.setAttribute("aria-busy",String(assistantAction));
   const error=!!session && ["error","failed","blocked","auth_required","quota_exhausted","server_unavailable","access_unavailable","provider_unavailable","invalid_output","expired"].includes(session.phase);
-  const phases={starting:"Starting Antigravity…",running:"Reviewing pending frames.",paused:"Paused. Progress is saved.",restarting:"Restarting the worker in this session…",stopped:"Session stopped. Start Antigravity to continue.",disconnected:"Assistant disconnected.",expired:"Access expired. Start Antigravity to reconnect."};
-  status.textContent=assistantAction?(active?"Pausing Antigravity…":"Starting Antigravity…"):session?(typeof session.message==="string" && session.message?session.message:phases[session.phase] || "Check PowerShell for session details."):!assistantsAvailable?"Assistant connections unavailable.":typeof assistantLoaded!=="undefined" && !assistantLoaded?"Loading Antigravity…":!launcher?.available?"Automatic launch unavailable. Use a manual connection.":"Ready to review this recording.";
+  const phases={starting:"Starting Antigravity…",running:"Reviewing pending frames.",paused:"Paused. Progress is saved.",restarting:"Restarting the worker in this session…",stopped:"Session stopped. Resume to continue.",disconnected:"Assistant disconnected.",expired:"Access expired. Start Antigravity to reconnect."};
+  status.textContent=assistantAction?(active?"Pausing Antigravity…":"Starting Antigravity…"):session?(typeof session.message==="string" && session.message?session.message:phases[session.phase] || "Check Command Prompt for session details."):!assistantsAvailable?"Assistant connections unavailable.":typeof assistantLoaded!=="undefined" && !assistantLoaded?"Loading Antigravity…":!launcher?.available?"Automatic launch unavailable. Use a manual connection.":"Ready to review this recording.";
   status.hidden=!session && !assistantAction && !!launcher?.available && assistantsAvailable && (typeof assistantLoaded==="undefined" || assistantLoaded);
   status.classList.toggle("error",error && !assistantAction);
 }
@@ -901,7 +975,7 @@ async function refreshAssistantManifest(annotationVersion=null) {
     const previous=frame; manifest=loaded;
     const list=visibleFrames(), next=list.find(item=>item.id===currentId) || list[0];
     if(gridSize===1 && next && previous?.id===next.id && previous.status===next.status && JSON.stringify(previous.flags)===JSON.stringify(next.flags) && image) {
-      frame=next; boxes=clone(next.boxes); selected=Math.min(selected,boxes.length-1); history=[]; editVersion++; renderBoxes(); refreshProgress(); draw();
+      frame=next; boxes=clone(next.boxes); selected=Math.min(selected,boxes.length-1); setBoxSelection(selectedBoxIndices(),selected); history=[]; editVersion++; renderBoxes(); refreshProgress(); draw();
       const revision=[...$("meta").children].find(node=>node.textContent.startsWith("revision ")); if(revision) revision.textContent=`revision ${next.revision}`;
     } else if(gridSize!==1 && previous?.id===next?.id) { frame=next || null; boxes=next?clone(next.boxes):[]; refreshProgress(); }
     else await showFrame(next?.id);
@@ -1555,7 +1629,7 @@ function applyProposals() {
   if(!currentProposal()) { clearProposals(); draw(); updateWorkbenchControls(); return; }
   const additions=[];
   for(const box of proposal.boxes) if(!boxes.some(existing=>sameBox(existing,box)) && !additions.some(existing=>sameBox(existing,box))) additions.push(clone(box));
-  if(additions.length) { pushHistory(true); boxes.push(...additions); selected=boxes.length-additions.length; }
+  if(additions.length) { pushHistory(true); boxes.push(...additions); setBoxSelection(additions.map((box,index)=>boxes.length-additions.length+index)); }
   proposal.boxes=[];
   if(additions.length) { setDirty(true); renderBoxes(); }
   renderProposalPreview(); draw(); notice(additions.length?`Added ${additions.length} model boxes.`:"No new model boxes.");
@@ -1564,7 +1638,7 @@ function useEstimate(id) {
   if(!currentProposal() || !canEdit() || drag || frame.status==="approved") return;
   const estimate=proposal.estimates.find(item=>item.estimate_id===id); if(!estimate) return;
   const duplicate=boxes.some(box=>sameBox(box,estimate));
-  if(!duplicate) { pushHistory(true); boxes.push(annotationBox(estimate,false)); selected=boxes.length-1; }
+  if(!duplicate) { pushHistory(true); boxes.push(annotationBox(estimate,false)); setBoxSelection([boxes.length-1]); }
   proposal.estimates=proposal.estimates.filter(item=>!sameBox(item,estimate));
   if(!duplicate) { setDirty(true); renderBoxes(); }
   renderProposalPreview(); draw(); notice(duplicate?"A matching box already exists.":"Estimate added as an editable box.");
@@ -1590,73 +1664,96 @@ function hitCandidates(p) {
     }).map(item=>item.index);
 }
 function startPan(event,deselect=false) {
-  drag={kind:"pan",pointerId:event.pointerId,start:canvasPoint(event),original:{x:view.x,y:view.y},originalSelected:selected};
-  if(deselect) selectBox(-1);
-  updateCursor(); updateButtons();
+  drag={kind:"pan",pointerId:event.pointerId,start:canvasPoint(event),original:{x:view.x,y:view.y},originalSelected:selected,originalSelection:selectedBoxIndices()};
+  if(deselect) selectBox(-1); updateCursor(); updateButtons();
 }
-canvas.addEventListener("pointerdown", event => {
+canvas.addEventListener("contextmenu",event=>{if(canEdit() && !drag) {event.preventDefault();setClass(1-drawClass);}});
+canvas.addEventListener("pointerdown",event=>{
   if(drag) return;
-  if(image && !busy && (event.button===1 || (event.button===0 && spacePan))) {
-    event.preventDefault(); canvas.focus({preventScroll:true}); canvas.setPointerCapture(event.pointerId);
-    startPan(event); return;
+  if(image && !busy && (event.button===1 || event.button===0 && spacePan)) {
+    event.preventDefault();canvas.focus({preventScroll:true});canvas.setPointerCapture(event.pointerId);startPan(event);return;
   }
-  if(!canReview() || event.button!==0) return; event.preventDefault(); canvas.focus({preventScroll:true}); const p=point(event);
-  canvas.setPointerCapture(event.pointerId);
-  if(!canEdit()) { startPan(event,true); return; }
-  if(tool === "draw") { drag={kind:"draw",pointerId:event.pointerId,start:p,latest:p}; draw(); updateWorkbenchControls(); return; }
-  const candidates=hitCandidates(p);
-  if(!event.altKey && selected>=0 && boxes[selected] && (!candidates.length || candidates[0]===selected)) {
-    const rect=canvas.getBoundingClientRect(); const handle=handles(boxes[selected]).find(([x,y])=>Math.abs(x-p.x)*rect.width*view.scale<=8 && Math.abs(y-p.y)*rect.height*view.scale<=8);
-    if(handle) { drag={kind:"resize",pointerId:event.pointerId,index:selected,handle:handle[2],start:p,screenStart:{x:event.clientX,y:event.clientY},original:clone(boxes[selected]),committed:false}; updateWorkbenchControls(); return; }
+  if(!canReview() || event.button!==0) return;
+  event.preventDefault();canvas.focus({preventScroll:true});const p=point(event);canvas.setPointerCapture(event.pointerId);
+  if(!canEdit()) {startPan(event,true);return;}
+  if(event.shiftKey) {
+    setTool("select");
+    drag={kind:"marquee",pointerId:event.pointerId,start:p,latest:p,originalSelected:selected,originalSelection:selectedBoxIndices()};
+    setBoxSelection([]);renderBoxes();draw();return;
+  }
+  if(tool==="draw") {drag={kind:"draw",pointerId:event.pointerId,start:p,latest:p};draw();updateWorkbenchControls();return;}
+  const candidates=hitCandidates(p),chosen=selectedBoxIndices();
+  if(chosen.length===1 && !event.altKey && selected>=0 && boxes[selected] && (!candidates.length || candidates[0]===selected)) {
+    const rect=canvas.getBoundingClientRect(),handle=handles(boxes[selected]).find(([x,y])=>Math.abs(x-p.x)*rect.width*view.scale<=8 && Math.abs(y-p.y)*rect.height*view.scale<=8);
+    if(handle) {drag={kind:"resize",pointerId:event.pointerId,index:selected,handle:handle[2],start:p,screenStart:{x:event.clientX,y:event.clientY},original:clone(boxes[selected]),committed:false};updateWorkbenchControls();return;}
   }
   const found=candidates.length?(event.altKey?candidates[(candidates.indexOf(selected)+1)%candidates.length]:candidates[0]):-1;
-  if(found<0 && view.scale>1) { startPan(event,true); return; }
-  selectBox(found);
-  if(found>=0) { drag={kind:"move",pointerId:event.pointerId,index:found,start:p,screenStart:{x:event.clientX,y:event.clientY},original:clone(boxes[found]),committed:false}; updateWorkbenchControls(); }
+  if(found<0 && view.scale>1) {startPan(event,true);return;}
+  if(found>=0 && boxIsSelected(found) && !event.altKey) {selected=found;renderBoxes();draw();} else selectBox(found);
+  if(found>=0) {drag={kind:"move",pointerId:event.pointerId,start:p,screenStart:{x:event.clientX,y:event.clientY},originals:selectedBoxIndices().map(index=>({index,box:clone(boxes[index])})),committed:false};updateWorkbenchControls();}
 });
-canvas.addEventListener("pointermove", event => {
+canvas.addEventListener("pointermove",event=>{
   if(drag && drag.pointerId!==event.pointerId) return;
-  if(drag?.kind==='pan') {
-    const p=canvasPoint(event); view.x=drag.original.x+p.x-drag.start.x; view.y=drag.original.y+p.y-drag.start.y;
-    clampView(); draw(); return;
-  }
-  if(!drag) return; const p=point(event); drag.latest=p;
+  if(drag?.kind==="pan") {const p=canvasPoint(event);view.x=drag.original.x+p.x-drag.start.x;view.y=drag.original.y+p.y-drag.start.y;clampView();draw();return;}
+  if(!drag) return;const p=point(event);drag.latest=p;
+  if(drag.kind==="marquee") {setBoxSelection(marqueeBoxIndices(drag.start,p));renderBoxes();draw();return;}
   if(drag.kind!=="draw") {
     if(!drag.committed && Math.hypot(event.clientX-drag.screenStart.x,event.clientY-drag.screenStart.y)<3) return;
-    const box=clone(drag.original), dx=p.x-drag.start.x, dy=p.y-drag.start.y;
-    if(drag.kind==="move") { const ax=Math.max(-box.x1,Math.min(1-box.x2,dx)), ay=Math.max(-box.y1,Math.min(1-box.y2,dy)); box.x1+=ax; box.x2+=ax; box.y1+=ay; box.y2+=ay; }
-    else { const h=drag.handle; if(h.includes("w")) box.x1=Math.min(p.x,box.x2-1/640); if(h.includes("e")) box.x2=Math.max(p.x,box.x1+1/640); if(h.includes("n")) box.y1=Math.min(p.y,box.y2-1/448); if(h.includes("s")) box.y2=Math.max(p.y,box.y1+1/448); }
-    if(JSON.stringify(box)!==JSON.stringify(drag.original)) {
-      if(!drag.committed) { pushHistory(); drag.committed=true; }
-      delete box.score;
+    if(drag.kind==="move") {
+      const moved=translatedBoxes(drag.originals.map(item=>item.box),p.x-drag.start.x,p.y-drag.start.y);
+      const changed=moved.some((box,index)=>JSON.stringify(box)!==JSON.stringify(drag.originals[index].box));
+      if(changed && !drag.committed) {pushHistory();drag.committed=true;}
+      drag.originals.forEach((item,index)=>{const box=moved[index];if(changed) delete box.score;boxes[item.index]=box;});
+    } else {
+      const box=clone(drag.original),h=drag.handle;
+      if(h.includes("w")) box.x1=Math.min(p.x,box.x2-1/640);if(h.includes("e")) box.x2=Math.max(p.x,box.x1+1/640);
+      if(h.includes("n")) box.y1=Math.min(p.y,box.y2-1/448);if(h.includes("s")) box.y2=Math.max(p.y,box.y1+1/448);
+      if(JSON.stringify(box)!==JSON.stringify(drag.original)) {if(!drag.committed){pushHistory();drag.committed=true;}delete box.score;}
+      boxes[drag.index]=box;
     }
-    boxes[drag.index]=box; setDirty(); renderBoxes();
+    setDirty();renderBoxes();
   }
   draw();
 });
 function finishDrag(event,cancel=false) {
-  if(!drag) return;
-  if(event?.pointerId!==undefined && event.pointerId!==drag.pointerId) return;
+  if(!drag || event?.pointerId!==undefined && event.pointerId!==drag.pointerId) return;
   const pointerId=drag.pointerId;
-  if(drag.kind==='pan') {
-    if(cancel) { view.x=drag.original.x; view.y=drag.original.y; selected=drag.originalSelected; }
-    drag=null; if(canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId); updateCursor(); renderBoxes(); draw(); return;
+  if(drag.kind==="pan") {
+    if(cancel) {view.x=drag.original.x;view.y=drag.original.y;setBoxSelection(drag.originalSelection,drag.originalSelected);}
+    drag=null;if(canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);updateCursor();renderBoxes();draw();return;
+  }
+  if(drag.kind==="marquee") {
+    if(cancel) setBoxSelection(drag.originalSelection,drag.originalSelected);
+    else if(Math.abs(drag.latest.x-drag.start.x)*640<2 && Math.abs(drag.latest.y-drag.start.y)*448<2) {
+      const found=hitCandidates(drag.start)[0],chosen=new Set(drag.originalSelection);
+      if(found!==undefined) {if(chosen.has(found))chosen.delete(found);else chosen.add(found);}setBoxSelection([...chosen],found);
+    }
+    drag=null;if(canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);renderBoxes();draw();updateButtons();return;
   }
   const changed=drag.committed || drag.kind==="draw";
-  if(cancel && drag.kind!=="draw" && drag.committed) { boxes[drag.index]=drag.original; history.pop(); }
-  if(!cancel && drag.kind==="draw") { const end=point(event), start=drag.start; if(Math.abs(end.x-start.x)*640>=1 && Math.abs(end.y-start.y)*448>=1) { pushHistory(); boxes.push({class_id:drawClass,x1:Math.min(start.x,end.x),y1:Math.min(start.y,end.y),x2:Math.max(start.x,end.x),y2:Math.max(start.y,end.y)}); selected=boxes.length-1; } }
-  drag=null; if(canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId); if(changed) setDirty(); renderBoxes(); draw(); updateCursor();
+  if(cancel && drag.committed) {if(drag.kind==="move")drag.originals.forEach(item=>boxes[item.index]=item.box);else boxes[drag.index]=drag.original;history.pop();}
+  if(!cancel && drag.kind==="draw") {
+    const end=event?point(event):drag.latest,start=drag.start;
+    if(Math.abs(end.x-start.x)*640>=1 && Math.abs(end.y-start.y)*448>=1) {pushHistory();boxes.push({class_id:drawClass,x1:Math.min(start.x,end.x),y1:Math.min(start.y,end.y),x2:Math.max(start.x,end.x),y2:Math.max(start.y,end.y)});setBoxSelection([boxes.length-1]);}
+  }
+  drag=null;if(canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);if(changed)setDirty();renderBoxes();draw();updateCursor();
 }
-canvas.addEventListener("pointerup",event=>finishDrag(event)); canvas.addEventListener("pointercancel",event=>finishDrag(event,true));
+canvas.addEventListener("pointerup",event=>finishDrag(event));canvas.addEventListener("pointercancel",event=>finishDrag(event,true));
 canvas.addEventListener("lostpointercapture",event=>finishDrag(event,true));
-canvas.addEventListener('auxclick',event=>{if(event.button===1) event.preventDefault();});
-function removeSelected() { if(!canEdit()||drag||selected<0) return; pushHistory(); boxes.splice(selected,1); selected=-1; setDirty(); renderBoxes(); draw(); }
+canvas.addEventListener("auxclick",event=>{if(event.button===1)event.preventDefault();});
+function removeSelected() {
+  const chosen=selectedBoxIndices();if(!canEdit() || drag || !chosen.length) return;
+  pushHistory();for(const index of chosen.reverse())boxes.splice(index,1);setBoxSelection([]);setDirty();renderBoxes();draw();
+}
+function changeSelectedClass(value) {
+  const chosen=selectedBoxIndices();if(!canEdit() || drag || ![0,1].includes(value) || !chosen.length || chosen.every(index=>boxes[index].class_id===value)) return;
+  pushHistory();for(const index of chosen){boxes[index].class_id=value;delete boxes[index].score;}setDirty();renderBoxes();draw();
+}
 function undo() {
-  if(!canEdit()||drag||!history.length) return;
-  const state=history.pop(); boxes=state.boxes; selected=state.selected;
-  const restorePreview=proposalContextMatches(state.proposal);
-  if(restorePreview) proposal=state.proposal;
-  setDirty(restorePreview); renderBoxes(); if(restorePreview) renderProposalPreview(); draw();
+  if(!canEdit() || drag || !history.length) return;
+  const state=history.pop();boxes=state.boxes;setBoxSelection(state.selection || [state.selected],state.selected);
+  const restorePreview=proposalContextMatches(state.proposal);if(restorePreview)proposal=state.proposal;
+  setDirty(restorePreview);renderBoxes();if(restorePreview)renderProposalPreview();draw();
 }
 $("toggleWorkbench").onclick=()=>setWorkbenchOpen(!$("reviewMain").classList.contains("workbench-open"));
 document.addEventListener("pointerdown",event=>{ if(!$("workbenchPanel").contains(event.target) && !$("toggleWorkbench").contains(event.target)) setWorkbenchOpen(false); });
@@ -1672,7 +1769,7 @@ $("selectTool").onclick=()=>setTool("select"); $("drawTool").onclick=()=>setTool
 $("zoomIn").onclick=()=>zoomTo(view.scale*1.25); $("zoomOut").onclick=()=>zoomTo(view.scale/1.25); $("zoomReset").onclick=fitImage;
 $("labelsToggle").onclick=()=>{ showLabels=!showLabels; $("labelsToggle").setAttribute("aria-pressed",String(showLabels));  $("labelsToggle").classList.toggle("active",showLabels); draw(); renderGridInfo(); };
 $("delete").onclick=removeSelected; $("undo").onclick=undo;
-$("selectedClass").onchange=()=>{ if(!canEdit()||selected<0) return; pushHistory(); boxes[selected].class_id=Number($("selectedClass").value); delete boxes[selected].score; setDirty(); renderBoxes(); draw(); };
+$("selectedClass").onchange=()=>{if($("selectedClass").value!=="")changeSelectedClass(Number($("selectedClass").value));};
 $("previous").onclick=()=>{ const list=visibleFrames(), index=list.findIndex(item=>item.id===currentId); if(index>0) navigate(list[index-1].id); };
 $("next").onclick=()=>{ const list=visibleFrames(), index=list.findIndex(item=>item.id===currentId); if(index<list.length-1) navigate(list[index+1].id); };
 $("filter").onchange=async()=>{ if(!discardOkay()) { $("filter").value=currentFilter; return; } resetGridSelection(); currentFilter=$("filter").value; gridPage=0; await showFrame(visibleFrames()[0]?.id); };
@@ -1767,19 +1864,28 @@ $("trainingForm").onsubmit=async event=>{
 $("suggestBoxes").onclick=suggestBoxes; $("applyProposals").onclick=applyProposals;
 $("proposalAssist").onchange=()=>{ clearProposals(); updateWorkbenchControls(); draw(); };
 $("discardProposals").onclick=()=>{ clearProposals(); updateWorkbenchControls(); draw(); notice(""); };
-document.addEventListener("keydown",event=>{
-  if(event.key==="Escape" && drag) { event.preventDefault(); finishDrag(null,true); return; }
-  if(document.querySelector("dialog[open]") || /INPUT|SELECT|TEXTAREA/.test(event.target.tagName)) return;
-  if(event.code==='Space' && document.activeElement===canvas && image) { event.preventDefault(); spacePan=true; updateCursor(); return; }
+function handleReviewKey(event) {
+  if(event.key==="Escape" && drag) {event.preventDefault();finishDrag(null,true);return;}
+  if(document.querySelector("dialog[open],.single-frame.workbench-open") || /INPUT|SELECT|TEXTAREA/.test(event.target.tagName) || event.target.isContentEditable || event.target.closest?.('[contenteditable="true"],[role="textbox"]')) return;
+  if(event.code==="Space" && document.activeElement===canvas && image) {event.preventDefault();spacePan=true;updateCursor();return;}
   if(drag) return;
-  if(gridSize!==1) { if(event.key==="ArrowLeft" || event.key==="ArrowRight") { event.preventDefault(); $(event.key==="ArrowLeft"?"gridPrevious":"gridNext").click(); } return; }
-  if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="z") { event.preventDefault(); undo(); return; }
-  if(event.key==="ArrowLeft" || event.key==="ArrowRight") { event.preventDefault(); $(event.key==="ArrowLeft"?"previous":"next").click(); return; }
-  if(!canEdit()) return;
-  if(event.key==="Delete"||event.key==="Backspace") { event.preventDefault(); removeSelected(); }
-  else if(event.key.toLowerCase()==="v") setTool("select"); else if(event.key.toLowerCase()==="d") setTool("draw");
-  else if(event.key==="1") setClass(0); else if(event.key==="2") setClass(1);
-});
+  const key=event.key.toLowerCase();
+  if((event.ctrlKey || event.metaKey) && key==="z" && gridSize===1) {event.preventDefault();undo();return;}
+  if(event.ctrlKey || event.metaKey || event.altKey) return;
+  if(key==="a" || key==="r") {
+    event.preventDefault();if(event.repeat || busy) return;
+    if(gridSize!==1) requestGridReview(key==="a"?"approved":"rejected",gridSelection.size===0);
+    else {const button=$(key==="a"?"approve":"reject");if(!button.disabled)button.click();}return;
+  }
+  if(event.key==="ArrowLeft" || event.key==="ArrowRight") {
+    event.preventDefault();const id=gridSize===1?(event.key==="ArrowLeft"?"previous":"next"):(event.key==="ArrowLeft"?"gridPrevious":"gridNext");if(!$(id).disabled)$(id).click();return;
+  }
+  if(gridSize!==1 || !canEdit()) return;
+  if(event.key==="Delete" || event.key==="Backspace") {event.preventDefault();removeSelected();}
+  else if(key==="v")setTool("select");else if(key==="d")setTool("draw");else if(event.key==="1")setClass(0);else if(event.key==="2")setClass(1);
+}
+document.addEventListener("keydown",handleReviewKey);
+
 document.addEventListener('keyup',event=>{if(event.code==='Space'){spacePan=false;updateCursor();}});
 window.addEventListener('blur',()=>{spacePan=false;if(drag) finishDrag(null,true);updateCursor();});
 window.addEventListener("beforeunload",event=>{ if(dirty) { event.preventDefault(); event.returnValue=""; } });
@@ -1789,10 +1895,11 @@ $("frameList").addEventListener("scroll",()=>{
 });
 setupSidebarGroups(); setupTrainingData(); setTool("select"); showEditingTips(); refreshWorkbench();
 refreshRecordings().finally(async()=>{ await loadManifest(); refreshEmptyScan(); refreshAssistants(); });
-setInterval(refreshWorkbench,3000);
-setInterval(refreshRecordings,3000);
-setInterval(refreshEmptyScan,3000);
-setInterval(()=>refreshAssistants(true),1000);
+setInterval(()=>{if(!document.hidden)refreshWorkbench();},3000);
+setInterval(()=>{if(!document.hidden)refreshRecordings();},3000);
+setInterval(()=>{if(!document.hidden)refreshEmptyScan();},3000);
+setInterval(pollAssistants,1000);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden){assistantLastPoll=0;pollAssistants();refreshWorkbench();refreshRecordings();refreshEmptyScan();}});
 </script>
 </body>
 </html>

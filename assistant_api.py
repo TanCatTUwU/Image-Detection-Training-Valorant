@@ -80,24 +80,35 @@ def _load(path, default):
 
 
 def _submission(payload):
-    if not isinstance(payload, dict) or set(payload) - {'frame_id', 'revision', 'boxes', 'request_id'} or not {'frame_id', 'revision', 'boxes'} <= set(payload):
-        raise ValueError('Expected frame_id, revision, boxes, and optional request_id')
+    if not isinstance(payload, dict) or set(payload) - {'frame_id', 'revision', 'boxes', 'edits', 'request_id'} or not {'frame_id', 'revision', 'boxes'} <= set(payload):
+        raise ValueError('Expected frame_id, revision, boxes, and optional edits and request_id')
     frame_id, revision, boxes = payload['frame_id'], payload['revision'], payload['boxes']
     if not isinstance(frame_id, str) or not FRAME_ID.fullmatch(frame_id) or type(revision) is not int or revision < 0:
         raise ValueError('Expected a valid frame ID and non-negative integer revision')
-    if not isinstance(boxes, list) or len(boxes) > 128:
-        raise ValueError('Assistant boxes must be a list with at most 128 rectangles')
-    clean = []
-    for box in boxes:
-        if not isinstance(box, dict) or set(box) - {'class_id', 'x1', 'y1', 'x2', 'y2', 'score'} or type(box.get('class_id')) is not int or box['class_id'] not in (0, 1):
-            raise ValueError('Assistant boxes require class_id 0 or 1 and normalized coordinates only')
-        values = [box.get(key) for key in ('x1', 'y1', 'x2', 'y2')]
-        if any(type(value) not in (int, float) or not math.isfinite(value) or not 0 <= value <= 1 for value in values) or values[2] <= values[0] or values[3] <= values[1]:
-            raise ValueError('Assistant boxes require finite positive rectangles normalized to 0..1')
-        if 'score' in box and (type(box['score']) not in (int, float) or not math.isfinite(box['score']) or not 0 <= box['score'] <= 1):
-            raise ValueError('Assistant score must be finite and in 0..1')
-        clean.append(dict(box))
-    normalized = dict(frame_id=frame_id, revision=revision, boxes=clean)
+    edits = payload.get('edits', [])
+    if not isinstance(boxes, list) or not isinstance(edits, list) or len(boxes) + len(edits) > 128:
+        raise ValueError('Assistant boxes and edits must be lists with at most 128 total rectangles')
+    normalized = dict(frame_id=frame_id, revision=revision, boxes=[])
+    targets = set()
+    for field, entries in (('boxes', boxes), ('edits', edits)):
+        clean = []
+        for box in entries:
+            allowed = {'class_id', 'x1', 'y1', 'x2', 'y2', 'score'} | ({'box_index'} if field == 'edits' else set())
+            if not isinstance(box, dict) or set(box) - allowed or type(box.get('class_id')) is not int or box['class_id'] not in (0, 1):
+                raise ValueError('Assistant boxes require class_id 0 or 1 and normalized coordinates only')
+            values = [box.get(key) for key in ('x1', 'y1', 'x2', 'y2')]
+            if any(type(value) not in (int, float) or not math.isfinite(value) or not 0 <= value <= 1 for value in values) or values[2] <= values[0] or values[3] <= values[1]:
+                raise ValueError('Assistant boxes require finite positive rectangles normalized to 0..1')
+            if 'score' in box and (type(box['score']) not in (int, float) or not math.isfinite(box['score']) or not 0 <= box['score'] <= 1):
+                raise ValueError('Assistant score must be finite and in 0..1')
+            if field == 'edits':
+                target = box.get('box_index')
+                if type(target) is not int or target < 0 or target in targets:
+                    raise ValueError('Each assistant edit requires a unique non-negative integer box_index')
+                targets.add(target)
+            clean.append(dict(box))
+        if field == 'boxes' or clean:
+            normalized[field] = clean
     fingerprint = hashlib.sha256(json.dumps(normalized, sort_keys=True, separators=(',', ':'), allow_nan=False).encode('utf-8')).hexdigest()
     request_id = payload.get('request_id', fingerprint)
     if not isinstance(request_id, str) or not re.fullmatch(r'[A-Za-z0-9._:-]{1,128}', request_id):
@@ -224,7 +235,7 @@ class AssistantHub:
         for entry in state['requests'].values():
             if entry['state'] == 'applied':
                 key = entry['connection_id'], entry['frame_id']
-                completed[key] = max(completed.get(key, -1), entry['revision'] + int(entry.get('added', 0) > 0))
+                completed[key] = max(completed.get(key, -1), entry.get('applied_revision', entry['revision'] + int(entry.get('added', 0) > 0 or entry.get('edited', 0) > 0)))
         if completed:
             with self._progress.transaction() as database:
                 for (connection_id, fid), revision in completed.items():
@@ -251,21 +262,22 @@ class AssistantHub:
             result['error'] = 'Provider usage is unavailable'
         return result
 
-    def _public(self, connection, state=None, manifest=None):
-        store = self._store(connection)
-        state = state if state is not None else self._state(store, clone=False)
-        self._migrate_progress(store, state)
-        requests = state['requests'].values()
-        owned = [entry for entry in requests if entry['connection_id'] == connection['id']]
-        manifest = manifest if manifest is not None else self._manifest(store)
-        progress = self._progress.snapshot(connection['id'], {frame['id']: frame for frame in manifest['frames']})
-        if connection['provider']=='antigravity':
-            completed=self._progress.recording_completed(connection['recording_id'],'antigravity')
-            current_ids={frame['id'] for frame in manifest['frames']}
-            progress['processed']=sum(fid in current_ids for fid in completed)
-            if not progress['last_completed_frame']:
-                progress['last_completed_frame']=self._progress.recording_last(connection['recording_id'],'antigravity')
-        return dict(id=connection['id'], name=connection['name'], provider=connection['provider'], recording_id=connection['recording_id'], status=self._status(connection), last_seen=connection.get('last_seen'), processed=progress['processed'], queued=sum(entry['state'] == 'queued' for entry in owned), last_error=connection.get('last_error'), usage=self._usage(connection), progress=progress)
+    def _public(self, connection, state=None, manifest=None, *, progress=None, queued=None):
+        if progress is None:
+            store = self._store(connection)
+            state = state if state is not None else self._state(store, clone=False)
+            self._migrate_progress(store, state)
+            manifest = manifest if manifest is not None else self._manifest(store)
+            progress = self._progress.snapshot(connection['id'], {frame['id']: frame for frame in manifest['frames']})
+            if connection['provider']=='antigravity':
+                completed=self._progress.recording_completed(connection['recording_id'],'antigravity')
+                current_ids={frame['id'] for frame in manifest['frames']}
+                progress['processed']=sum(fid in current_ids for fid in completed)
+                if not progress['last_completed_frame']:
+                    progress['last_completed_frame']=self._progress.recording_last(connection['recording_id'],'antigravity')
+        if queued is None:
+            queued = sum(entry['state'] == 'queued' and entry['connection_id'] == connection['id'] for entry in state['requests'].values())
+        return dict(id=connection['id'], name=connection['name'], provider=connection['provider'], recording_id=connection['recording_id'], status=self._status(connection), last_seen=connection.get('last_seen'), processed=progress['processed'], queued=queued, last_error=connection.get('last_error'), usage=self._usage(connection), progress=progress)
 
     def connect(self, store, payload):
         if not isinstance(payload, dict) or set(payload) != {'provider', 'name'} or payload.get('provider') not in PROVIDERS:
@@ -341,9 +353,33 @@ class AssistantHub:
             recording_id = _recording_id(store.root)
             state = self._state(store, clone=False) if hasattr(store, '_path') else dict(requests={})
             manifest = self._manifest(store)
+            connections = [entry for entry in self._registry['connections'].values() if entry['recording_id'] == recording_id]
+            public = []
+            if connections:
+                root = store.root.resolve(strict=True)
+                canonical = os.path.normcase(str(root))
+                for connection in connections:
+                    if os.path.normcase(connection['root']) != canonical and self._store(connection).root != root:
+                        raise AssistantUnauthorized('The assistant recording scope is invalid')
+                self._migrate_progress(store, state)
+                frames = {frame['id']: frame for frame in manifest['frames']}
+                scope = (recording_id, 'antigravity') if any(connection['provider'] == 'antigravity' for connection in connections) else None
+                batch = self._progress.snapshot_many([connection['id'] for connection in connections], frames, recording_scope=scope)
+                processed = sum(fid in frames for fid in batch['completed'])
+                queued = {}
+                for entry in state['requests'].values():
+                    if entry['state'] == 'queued':
+                        queued[entry['connection_id']] = queued.get(entry['connection_id'], 0) + 1
+                for connection in connections:
+                    progress = batch['snapshots'][connection['id']]
+                    if connection['provider'] == 'antigravity':
+                        progress['processed'] = processed
+                        if not progress['last_completed_frame']:
+                            progress['last_completed_frame'] = batch['last_completed_frame']
+                    public.append(self._public(connection, progress=progress, queued=queued.get(connection['id'], 0)))
             signature = self._signature(store._path('manifest.json')) if hasattr(store, '_path') else None
             version = hashlib.sha256(repr(signature).encode('ascii')).hexdigest()[:24] if signature else None
-            return dict(connections=[self._public(entry, state, manifest) for entry in self._registry['connections'].values() if entry['recording_id'] == recording_id], providers=list(PROVIDERS), annotation_version=version)
+            return dict(connections=public, providers=list(PROVIDERS), annotation_version=version)
 
     def disconnect(self, store, payload):
         if not isinstance(payload, dict) or set(payload) != {'connection_id'} or not isinstance(payload['connection_id'], str):
@@ -435,7 +471,7 @@ class AssistantHub:
             if entry['connection_id'] != connection_id or entry['frame_id'] != frame['id'] or entry['revision'] != revision:
                 continue
             receipt = receipts.get(key)
-            if receipt and receipt.get('fingerprint') == entry['fingerprint'] and frame['revision'] == revision + int(receipt.get('added', 0) > 0):
+            if receipt and receipt.get('fingerprint') == entry['fingerprint'] and frame['revision'] == receipt.get('applied_revision', revision + int(receipt.get('added', 0) > 0 or receipt.get('edited', 0) > 0)):
                 return frame['revision']
         raise AssistantConflict('This pending frame changed. Reload it before reporting completion.')
 
@@ -515,29 +551,36 @@ class AssistantHub:
                 return dict(connection=self._public(connection, state, manifest))
 
     def _result(self, store, entry):
-        result = dict(state=entry['state'], added=entry.get('added', 0), duplicate=entry.get('duplicate', 0))
+        result = dict(state=entry['state'], added=entry.get('added', 0), edited=entry.get('edited', 0), duplicate=entry.get('duplicate', 0))
         if entry['state'] == 'applied':
+            result['applied_revision'] = entry.get('applied_revision', entry['revision'] + int(entry.get('added', 0) > 0 or entry.get('edited', 0) > 0))
             frame = store._frame(self._manifest(store), entry['frame_id'])
             if frame['status'] == 'pending':
                 result['frame'] = copy.deepcopy(frame)
         return result
 
     def _apply(self, store, key, entry):
+        def authorize():
+            connection = self._processing_connection(entry['connection_id'])
+            if connection['recording_id'] != _recording_id(store.root):
+                raise AssistantUnauthorized('The assistant token is scoped to another recording')
+        authorize()
         snapshot = self._manifest(store)
         receipt = snapshot.get('assistant_receipts', {}).get(key)
         if receipt is not None:
             if receipt['fingerprint'] != entry['fingerprint']:
                 raise AssistantConflict('This assistant request already has a different payload')
-            result = dict(state='applied', added=receipt['added'], duplicate=receipt['duplicate'])
+            result = dict(state='applied', added=receipt['added'], edited=receipt.get('edited', 0), duplicate=receipt['duplicate'], applied_revision=receipt.get('applied_revision', entry['revision'] + int(receipt['added'] > 0 or receipt.get('edited', 0) > 0)))
             frame = store._frame(snapshot, entry['frame_id'])
             if frame['status'] == 'pending':
                 result['frame'] = copy.deepcopy(frame)
         else:
-            result = store.merge_assistant(entry['frame_id'], entry['revision'], entry['boxes'], key, entry['fingerprint'])
-        entry.update(state='applied', added=result['added'], duplicate=result['duplicate'])
+            result = store.merge_assistant(entry['frame_id'], entry['revision'], entry['boxes'], key, entry['fingerprint'], edits=entry.get('edits', []), authorize=authorize)
+        entry.update(state='applied', added=result['added'], edited=result['edited'], duplicate=result['duplicate'], applied_revision=result['applied_revision'])
         entry.pop('boxes', None)
+        entry.pop('edits', None)
         with self._progress.transaction() as database:
-            self._progress.success(database, entry['connection_id'], entry['frame_id'], entry['revision'] + int(result['added'] > 0), _utc())
+            self._progress.success(database, entry['connection_id'], entry['frame_id'], result['applied_revision'], _utc())
         return result
 
     def submit(self, connection_id, payload):
@@ -559,6 +602,8 @@ class AssistantHub:
             frame = store._frame(manifest, normalized['frame_id'])
             if frame['status'] != 'pending' or frame['revision'] != normalized['revision']:
                 raise AssistantConflict('This pending frame changed. Reload it before submitting boxes.')
+            if any(edit['box_index'] >= len(frame['boxes']) for edit in normalized.get('edits', [])):
+                raise ValueError('Assistant edit box_index does not target an existing box')
             if not store._path(frame['image']).is_file():
                 raise ValueError('The requested frame image has not been extracted')
             if len(state['requests']) >= 4096 or sum(item['state'] == 'queued' for item in state['requests'].values()) >= 256:
@@ -566,14 +611,19 @@ class AssistantHub:
             provenance = dict(provider=connection['provider'], name=connection['name'], connection_id=connection_id)
             boxes = [dict(box, assistant=provenance) for box in normalized['boxes']]
             entry = dict(connection_id=connection_id, fingerprint=fingerprint, frame_id=normalized['frame_id'], revision=normalized['revision'], boxes=boxes, state='queued', created_at=_utc())
+            if normalized.get('edits'):
+                entry['edits'] = [dict(edit, assistant_edit=provenance) for edit in normalized['edits']]
             state['requests'][key] = entry
             self._save_state(store, state)
             if manifest['status'] == 'complete':
                 try:
                     result = self._apply(store, key, entry)
                 except (ValueError, KeyError) as exc:
+                    if isinstance(exc, AssistantUnauthorized) and connection.get('processing_paused') and self._valid(connection):
+                        raise
                     entry.update(state='failed', error=str(exc))
                     entry.pop('boxes', None)
+                    entry.pop('edits', None)
                     connection['last_error'] = str(exc)
                     self._save_state(store, state)
                     self._save()
@@ -607,8 +657,11 @@ class AssistantHub:
                     self._apply(store, key, entry)
                     connection['last_error'] = None
                 except (ValueError, KeyError) as exc:
+                    if isinstance(exc, AssistantUnauthorized) and connection is not None and connection.get('processing_paused') and self._valid(connection):
+                        continue
                     entry.update(state='failed', error=str(exc))
                     entry.pop('boxes', None)
+                    entry.pop('edits', None)
                     if connection is not None:
                         connection['last_error'] = str(exc)
                 changed = True

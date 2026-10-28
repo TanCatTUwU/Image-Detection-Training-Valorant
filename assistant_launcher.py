@@ -11,6 +11,7 @@ import sys
 import threading
 import time
 from assistant_api import AssistantUnauthorized, _recording_id
+from assistant_loop import REASONS
 from model_registry import file_lock
 
 SESSION_ID = re.compile(r'session-[a-f0-9]{24}\Z')
@@ -140,8 +141,8 @@ class AssistantLauncher:
         except (OSError, ValueError, KeyError, TypeError):
             return False
 
-    def _set(self, entry, phase, *, active=None):
-        entry.update(phase=phase, message=MESSAGES[phase])
+    def _set(self, entry, phase, *, active=None, reason=None):
+        entry.update(phase=phase, message=MESSAGES[phase], reason=reason or (None if phase in ('starting', 'running') else phase))
         if active is not None:
             entry['active'] = active
 
@@ -172,9 +173,24 @@ class AssistantLauncher:
             entry.update(healthy_progress_at=healthy, launch_attempts=1, next_launch_at=self.clock() + 1)
             changed = True
         state = status.get('state')
-        if isinstance(state, str) and state in TERMINAL and (entry['active'] or entry['phase'] != state):
+        accepts = entry['phase'] not in ('paused', 'disconnected', 'expired') and isinstance(state, str) and state in MESSAGES and state != 'paused' and (entry['active'] or entry['phase'] == state)
+        if accepts:
+            reason = status.get('reason', state)
+            reason = reason if isinstance(reason, str) and reason in REASONS.keys() | MESSAGES.keys() else None
+            attempts = status.get('retry_attempts', entry.get('retry_attempts', 0))
+            if type(attempts) is int and 0 <= attempts <= 5:
+                if entry.get('retry_attempts') != attempts:
+                    entry['retry_attempts'] = attempts
+                    changed = True
+            if entry.get('reason') != reason:
+                entry['reason'] = reason
+                changed = True
+        if accepts and state in TERMINAL and (entry['active'] or entry['phase'] != state):
             self._processing_paused(entry, True)
-            self._set(entry, state, active=False)
+            self._set(entry, state, active=False, reason=entry.get('reason'))
+            changed = True
+        elif accepts and entry['active'] and state not in TERMINAL and state != entry['phase']:
+            self._set(entry, state, reason=entry.get('reason'))
             changed = True
         if changed:
             self._save()
@@ -196,7 +212,19 @@ class AssistantLauncher:
         return next((entry for entry in self._sessions.values() if entry['connection_id'] == connection_id), None)
 
     def _public(self, entry):
-        return {key: entry[key] for key in ('session_id', 'connection_id', 'active', 'phase', 'message')}
+        valid = self._valid(entry)
+        reason = entry.get('reason', entry['phase'])
+        reason = reason if isinstance(reason, str) and reason in REASONS.keys() | MESSAGES.keys() else None
+        result = {key: entry[key] for key in ('session_id', 'connection_id', 'active', 'phase')}
+        message = MESSAGES[entry['phase']]
+        if reason in REASONS:
+            message = REASONS[reason]
+            if entry['phase'] == 'provider_unavailable' and entry.get('retry_attempts') == 5:
+                message += ' Five automatic retries were exhausted. Resume to retry pending frames.'
+        attempts = entry.get('retry_attempts', 0)
+        worker_attempts = entry.get('launch_attempts', 0)
+        result.update(message=message, authorized=valid, resumable=bool(valid and not entry['active']), reason=reason, retry_attempts=attempts if type(attempts) is int and 0 <= attempts <= 5 else 0, retry_limit=5, worker_attempts=max(worker_attempts - 1, 0) if type(worker_attempts) is int and 0 <= worker_attempts <= 6 else 0, worker_retry_limit=5, last_progress_at=entry.get('healthy_progress_at'))
+        return result
 
     def _control(self, entry, valid):
         return dict(authorized=bool(valid), active=bool(valid and entry['active']), session_id=entry['session_id'] if entry else None, launch_id=entry.get('launch_id') if entry else None, model=MODEL)
@@ -276,13 +304,16 @@ class AssistantLauncher:
             raise ValueError('Invalid assistant worker launch budget')
         if attempts >= 6:
             self._processing_paused(entry, True)
-            self._set(entry, 'provider_unavailable', active=False)
+            self._set(entry, 'provider_unavailable', active=False, reason='worker_retry_exhausted')
             self._save()
             return
         next_launch = entry.get('next_launch_at', 0)
         if type(next_launch) not in (int, float) or not math.isfinite(next_launch):
             raise ValueError('Invalid assistant worker restart delay')
         if self.clock() < next_launch:
+            if finished and entry['phase'] != 'restarting':
+                self._set(entry, 'restarting', reason='worker_exited')
+                self._save()
             return
         launch_id = 'worker-' + secrets.token_hex(12)
         config_path = self._config_path(entry)
@@ -295,8 +326,7 @@ class AssistantLauncher:
         try:
             self._processes[entry['session_id']] = self.spawn(arguments, executable=self.console, env=environment, cwd=str(self.project), stdin=subprocess.DEVNULL, creationflags=getattr(subprocess, 'CREATE_NEW_CONSOLE', 0), shell=False)
         except (OSError, ValueError, subprocess.SubprocessError):
-            self._processing_paused(entry, True)
-            self._set(entry, 'stopped', active=False)
+            self._set(entry, 'restarting', reason='worker_launch_failed')
             self._save()
             raise ValueError('Could not open the assistant command console') from None
 
@@ -312,6 +342,8 @@ class AssistantLauncher:
                 raise ValueError('Python and the Windows command console are required for automatic assistant sessions')
             recording = _recording_id(store.root)
             entry = self._sessions.get(recording)
+            if entry:
+                self._reconcile(entry)
             if entry is None or not self._valid(entry):
                 adopted = self._legacy(store)
                 if adopted is None:
@@ -321,14 +353,22 @@ class AssistantLauncher:
                     connection, token = adopted
                     cid = connection['id']
                 entry = dict(session_id='session-' + secrets.token_hex(12), connection_id=cid, recording_id=recording, active=True, phase='starting', message=MESSAGES['starting'])
-                write_json(self._config_path(entry), dict(api_base=self.api_base, recording_id=recording, session_id=entry['session_id'], connection_id=cid, headers={'X-Assistant-Token': token}))
+                write_json(self._config_path(entry), dict(api_base=self.api_base, recording_id=recording, session_id=entry['session_id'], connection_id=cid, headers={'X-Assistant-Token': token}, retry_epoch=0))
                 self._sessions[recording] = entry
+                entry.update(launch_attempts=0, next_launch_at=0, retry_attempts=0)
             else:
+                if not entry['active'] and entry['phase'] != 'paused':
+                    config_path = self._config_path(entry)
+                    config = read_json(config_path)
+                    epoch = config.get('retry_epoch', 0)
+                    if type(epoch) is not int or epoch < 0:
+                        raise ValueError('Invalid assistant retry generation')
+                    write_json(config_path, dict(config, retry_epoch=epoch + 1))
+                    entry.update(launch_attempts=0, next_launch_at=0, retry_attempts=0)
                 self._set(entry, 'running', active=True)
             status = self._worker_status(entry)
             if status.get('state') in TERMINAL:
                 entry.update(ignore_status=True, ignored_launch_id=entry.get('launch_id'))
-            entry.update(launch_attempts=0, next_launch_at=0)
             self._processing_paused(entry, False)
             self._save()
             self._spawn(entry)
@@ -368,11 +408,12 @@ class AssistantLauncher:
                 self._expire(entry)
             elif payload['launch_id'] != entry.get('launch_id') or entry.get('ignore_status') and payload['launch_id'] == entry.get('ignored_launch_id'):
                 return self._control(entry, valid)
-            elif payload['state'] in TERMINAL:
+            elif payload['state'] in TERMINAL and entry['phase'] != 'paused':
                 self._processing_paused(entry, True)
                 self._set(entry, payload['state'], active=False)
             elif entry['active']:
                 self._set(entry, payload['state'])
+            self._reconcile(entry)
             self._save()
             return self._control(entry, valid)
 
@@ -392,9 +433,24 @@ class AssistantLauncher:
                 self._config_path(entry).unlink(missing_ok=True)
                 self._save()
 
-    def resume(self):
+    def supervise(self, stop_event, *, interval=5):
+        if type(interval) not in (int, float) or not math.isfinite(interval) or not .01 <= interval <= 60:
+            raise ValueError('Invalid assistant supervision interval')
+        while not stop_event.is_set():
+            try:
+                self.resume(stop_event=stop_event)
+            except (OSError, ValueError, RuntimeError):
+                pass
+            if stop_event.wait(interval):
+                return
+
+    def resume(self, *, stop_event=None):
+        if stop_event is not None and stop_event.is_set():
+            return
         with self._locked():
             for entry in self._sessions.values():
+                if stop_event is not None and stop_event.is_set():
+                    return
                 self._reconcile(entry)
                 if not entry['active']:
                     self._processing_paused(entry, True)
@@ -406,4 +462,6 @@ class AssistantLauncher:
                 config = read_json(config_path)
                 if config['api_base'] != self.api_base:
                     write_json(config_path, dict(config, api_base=self.api_base))
+                if stop_event is not None and stop_event.is_set():
+                    return
                 self._spawn(entry)
