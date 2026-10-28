@@ -37,6 +37,8 @@ class LibraryActions:
         if not isinstance(job, dict) or job.get('state') not in ACTIVE:
             return None
         pid = job.get('preparation_pid') if job.get('state') == 'preparing' else job.get('worker_pid') or job.get('launch_pid')
+        if folder == 'bundle-jobs' and type(pid) is not int:
+            return None
         return None if type(pid) is int and not process_alive(pid) else job
 
     def _refresh(self):
@@ -80,6 +82,9 @@ class LibraryActions:
             raise ValueError('Wait for training model export and registration to finish before deleting a model')
         if training and (_inside(training.get('checkpoint'), model_root) or training.get('options', {}).get('checkpoint_id') == model_id):
             raise ValueError('This model is in use by training; wait for training to stop')
+        bundle = self._active('bundle-jobs')
+        if bundle and (_inside(bundle.get('checkpoint'), model_root) or bundle.get('checkpoint_id') == model_id or bundle.get('options', {}).get('checkpoint_id') == model_id):
+            raise ValueError('This model is in use by a training ZIP bundle; wait for the export to finish')
         scan = self._active('empty-scan-jobs', 'active')
         if scan and (scan.get('model_id') == model_id or scan.get('model_path') == entry['path']):
             raise ValueError('This model is in use by empty screening; cancel the scan first')
@@ -101,6 +106,9 @@ class LibraryActions:
             raise ValueError('This recording is in use by training preparation; wait for preparation to finish')
         if training and _inside(training.get('data'), root):
             raise ValueError('This recording export is in use by training; wait for training to stop')
+        bundle = self._active('bundle-jobs')
+        if bundle and recording_id in bundle.get('source_recording_ids', []):
+            raise ValueError('This recording is in use by a training ZIP bundle; wait for the export to finish')
         scan = self._active('empty-scan-jobs', 'active')
         if scan and _inside(scan.get('run_path'), root):
             raise ValueError('This recording is in use by an empty scan; cancel the scan first')

@@ -543,6 +543,8 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
     launcher_lock = threading.Lock()
     supervisor_stop = threading.Event()
     supervisor_thread = None
+    bundles = None
+    bundle_lock = threading.Lock()
     lifecycle_lock = threading.RLock()
     recording_stores = {store.root: store}
 
@@ -572,6 +574,15 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                 from training_board import TrainingBoard
                 workbench = TrainingBoard(PROJECT)
             return workbench
+
+    def get_bundles():
+        nonlocal bundles
+        with bundle_lock:
+            if bundles is None:
+                from cloud_bundle import BundleManager
+                board = get_workbench()
+                bundles = BundleManager(PROJECT, board.registry)
+            return bundles
 
     def get_proposals():
         nonlocal proposals
@@ -680,7 +691,7 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                 return (parsed.path, None)
             if machine_tokens:
                 return (None, self._error(403, 'Assistant tokens cannot access browser review routes'))
-            if parsed.path == '/' and self.command == 'GET':
+            if self.command == 'GET' and (parsed.path == '/' or parsed.query and re.fullmatch(r'/api/training-bundle/download/job-[a-f0-9]{16}', parsed.path)):
                 query = parse_qs(parsed.query, keep_blank_values=True)
                 supplied = query.get('token', [''])
                 authorized = set(query) == {'token'} and len(supplied) == 1 and hmac.compare_digest(supplied[0], token)
@@ -713,13 +724,15 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                     recording_stores[root] = ReviewStore(root)
                 return recording_stores[root]
 
-        def _start_training(self, board, options, export_callback, source_recording_ids):
+        def _start_training(self, board, options, export_callback, source_recording_ids, bundle=False):
+            if bundle:
+                return get_bundles().start(options, export_callback, source_recording_ids=source_recording_ids)
             start = getattr(board, 'start_training_async', board.start_training)
             if callable(getattr(board, 'start_training_async', None)):
                 return start(options, export_callback, source_recording_ids=source_recording_ids)
             return start(options, export_callback)
 
-        def _training(self, payload):
+        def _training(self, payload, bundle=False):
             options = dict(payload)
             if 'recording_ids' not in options:
                 if 'validation_recording_ids' in options:
@@ -729,11 +742,11 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                     from recording_library import recording_id
                     current = self._store()
                     board = get_workbench()
-                    return self._start_training(board, options, lambda progress=None: export_recordings(getattr(board, 'project', PROJECT), [(recording_id(current.root), current)], background_ratio=options['background_ratio'], progress=progress), [recording_id(current.root)])
+                    return self._start_training(board, options, lambda progress=None: export_recordings(getattr(board, 'project', PROJECT), [(recording_id(current.root), current)], background_ratio=options['background_ratio'], progress=progress), [recording_id(current.root)], bundle=bundle)
                 board = get_workbench()
                 current = self._store()
                 from recording_library import recording_id
-                return self._start_training(board, options, lambda progress=None: current.export_reviewed(), [recording_id(current.root)])
+                return self._start_training(board, options, lambda progress=None: current.export_reviewed(), [recording_id(current.root)], bundle=bundle)
             from training_dataset import export_recordings, validate_recording_selection
             selected = options.pop('recording_ids')
             validation = options.pop('validation_recording_ids', [])
@@ -747,7 +760,7 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                         recording_stores[root] = ReviewStore(root)
                     sources.append((rid, recording_stores[root]))
             board = get_workbench()
-            return self._start_training(board, options, lambda progress=None: export_recordings(getattr(board, 'project', PROJECT), sources, validation, background_ratio=options.get('background_ratio', 0.25), progress=progress), selected)
+            return self._start_training(board, options, lambda progress=None: export_recordings(getattr(board, 'project', PROJECT), sources, validation, background_ratio=options.get('background_ratio', 0.25), progress=progress), selected, bundle=bundle)
 
         def do_GET(self):
             try:
@@ -779,6 +792,12 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                     return self._send(200, get_recordings().snapshot())
                 if route == '/api/deleted-items':
                     return self._send(200, get_actions().deleted_items())
+                if route == '/api/training-bundle':
+                    return self._send(200, get_bundles().snapshot())
+                bundle_download = re.fullmatch(r'/api/training-bundle/download/(job-[a-f0-9]{16})', route)
+                if bundle_download:
+                    archive = get_bundles().archive_path(bundle_download[1])
+                    return self._download(archive, archive.name)
                 if route == '/api/workbench':
                     return self._send(200, get_workbench().snapshot())
                 download = re.fullmatch(r'/api/models/([a-z0-9-]+)/download/(onnx|pt)', route)
@@ -809,7 +828,7 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
         def do_POST(self):
             serialized = {'/api/models/delete', '/api/recordings/delete', '/api/deleted-items/restore',
                           '/api/recordings/prepare', '/api/recordings/cancel', '/api/recordings/resume',
-                          '/api/training/start', '/api/models/import', '/api/models/convert',
+                          '/api/training/start', '/api/training-bundle/start', '/api/models/import', '/api/models/convert',
                           '/api/models/select', '/api/directml/run', '/api/empty-scan/start',
                           '/api/assistants/connect','/api/assistants/start','/api/assistants/pause','/api/assistants/disconnect'}
             try:
@@ -896,6 +915,10 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                     return self._send(200, self._store().reject_auto_removed())
                 if route == '/api/frames/review':
                     return self._send(200, self._store().review_frames(payload))
+                if route == '/api/training-bundle/start':
+                    return self._send(200, self._training(payload, bundle=True))
+                if route == '/api/training-bundle/reveal':
+                    return self._send(200, get_bundles().reveal(one_id(payload, 'job_id')))
                 if route == '/api/training/start':
                     return self._send(200, self._training(payload))
                 if route == '/api/models/select':
