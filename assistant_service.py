@@ -6,8 +6,8 @@ import re
 import threading
 import time
 from assistant_bridge import AssistantClient, AntigravityRunner, process_frames
-from assistant_launcher import MESSAGES, SESSION_ID, read_json, write_json
-from assistant_loop import AssistantRequestError, ServerUnavailable, REASONS, run_continuously
+from assistant_launcher import MESSAGES, SESSION_ID, read_json, safe_issue, write_json
+from assistant_loop import AssistantRequestError, ServerUnavailable, ISSUE_REASONS, REASONS, run_continuously
 from model_registry import file_lock
 
 PROJECT = Path(__file__).resolve().parent
@@ -98,6 +98,7 @@ def run_service(connection_file, *, project=None, client_factory=None, runner_fa
     retry_exhausted = False
     reason = [None]
     provider_retries = [0]
+    last_issue = [None]
     retry_path = path.parent / 'retry-state.json'
     retry_epoch = config.get('retry_epoch', 0)
     cache_root = project / 'runtime-data' / 'assistant-cache'
@@ -111,7 +112,10 @@ def run_service(connection_file, *, project=None, client_factory=None, runner_fa
             if not force and last_status[0] == state and now - last_status[1] < 5:
                 return
             changed = last_status[0] != state
-            write_json(status_path, dict(schema_version=1, session_id=sid, connection_id=config['connection_id'], launch_id=config.get('launch_id'), state=state, reason=reason[0], retry_attempts=max(retries, provider_retries[0]), retry_epoch=retry_epoch, heartbeat_at=time.time(), healthy_progress_at=healthy_progress_at[0]))
+            attempts = max(retries, provider_retries[0])
+            if reason[0] in ISSUE_REASONS and (last_issue[0] is None or last_issue[0]['reason'] != reason[0] or last_issue[0]['retry_attempts'] != attempts):
+                last_issue[0] = dict(reason=reason[0], at=now, retry_attempts=attempts)
+            write_json(status_path, dict(schema_version=1, session_id=sid, connection_id=config['connection_id'], launch_id=config.get('launch_id'), state=state, reason=reason[0], retry_attempts=attempts, retry_epoch=retry_epoch, heartbeat_at=now, healthy_progress_at=healthy_progress_at[0], last_issue=last_issue[0]))
             last_status[:] = [state, now]
             if changed and state in ('starting', 'running', 'paused', 'restarting'):
                 print(MESSAGES[state], flush=True)
@@ -175,6 +179,12 @@ def run_service(connection_file, *, project=None, client_factory=None, runner_fa
     if lock_path.is_symlink():
         raise ValueError('Invalid assistant worker lock')
     with file_lock(lock_path, timeout=.1):
+        try:
+            previous = read_json(status_path, {})
+            if previous.get('session_id') == sid:
+                last_issue[0] = safe_issue(previous.get('last_issue'))
+        except (OSError, ValueError):
+            pass
         saved = read_json(retry_path, {})
         if saved.get('session_id') == sid and saved.get('retry_epoch', 0) == retry_epoch:
             retries = saved.get('reconnect_attempts', 0)
@@ -255,7 +265,7 @@ def run_service(connection_file, *, project=None, client_factory=None, runner_fa
             close = getattr(runner, 'close', None)
             if callable(close):
                 close()
-            local_status(result['state'])
+            local_status(result['state'], force=True)
 
 
 def main(argv=None):

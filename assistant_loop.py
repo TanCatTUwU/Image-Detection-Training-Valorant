@@ -6,7 +6,8 @@ import re
 import threading
 import time
 
-REASONS = dict(provider_temporary_error='Antigravity had a temporary service error.', provider_empty_output='Antigravity returned no review output.', provider_session_ended='The Antigravity CLI session ended.', provider_timeout='The Antigravity CLI session timed out.', worker_exited='The assistant worker exited unexpectedly.', worker_launch_failed='The assistant command console could not open.', worker_retry_exhausted='The assistant worker could not stay running after five reconnect attempts.')
+REASONS = dict(provider_temporary_error='Antigravity had a temporary service error.', provider_empty_output='Antigravity returned no review output.', provider_invalid_output='Antigravity returned an invalid batch; retrying pending frames.', provider_session_ended='The Antigravity CLI session ended.', provider_timeout='The Antigravity CLI session timed out.', worker_exited='The assistant worker exited unexpectedly.', worker_launch_failed='The assistant command console could not open.', worker_retry_exhausted='The assistant worker could not stay running after five reconnect attempts.')
+ISSUE_REASONS = frozenset(REASONS) | {'server_unavailable', 'quota_exhausted', 'access_unavailable', 'provider_unavailable', 'invalid_output'}
 
 
 class AssistantRequestError(ValueError):

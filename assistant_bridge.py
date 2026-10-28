@@ -340,7 +340,12 @@ def _process_image_batch(client,runner,cache,frames,batch_id,total,connection,su
             summary['failed']+=len(checked)
             summary['errors'].append(dict(frame_id=None,error=str(exc)[:300]))
             raise
-        except (ValueError,OSError,subprocess.SubprocessError) as exc:
+        except ValueError as exc:
+            _progress_group(client,'fail',batch_id,checked,error='Invalid model response; pending frames will be retried')
+            summary['failed']+=len(checked)
+            summary['errors'].append(dict(frame_id=None,error='Invalid model response'))
+            raise ProviderTemporaryError('Antigravity returned an invalid batch',reason='provider_invalid_output') from exc
+        except (OSError,subprocess.SubprocessError) as exc:
             _progress_group(client,'fail',batch_id,checked,error='Provider returned an unusable batch; check the bridge before retrying')
             summary['failed']+=len(checked)
             summary['errors'].append(dict(frame_id=None,error=str(exc)[:200]))

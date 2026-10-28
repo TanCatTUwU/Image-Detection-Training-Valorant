@@ -32,7 +32,7 @@ def validate_recording_selection(recording_ids, validation_ids=()):
         raise ValueError('Keep at least one training recording outside the validation holdout')
 
 
-def export_recordings(project, stores, validation_ids=(), *, background_ratio=0):
+def export_recordings(project, stores, validation_ids=(), *, background_ratio=0, progress=None):
     from review_dataset import reviewed_training_frames, yolo_text
     if type(background_ratio) not in (int, float) or not 0 <= background_ratio <= 1 or not math.isfinite(background_ratio):
         raise ValueError('background_ratio must be a finite number from 0 to 1')
@@ -88,6 +88,16 @@ def export_recordings(project, stores, validation_ids=(), *, background_ratio=0)
             counts[role or frame['split']] += 1
     if not all(counts.values()):
         raise ValueError('Selected recordings need reviewed training and validation images; review both saved splits or choose a validation holdout')
+    total_frames = sum(counts.values())
+    completed_frames = 0
+
+    def report_progress(stage, completed, total, frame=None):
+        if progress is not None:
+            event = dict(stage=stage, completed=completed, total=total)
+            if frame is not None:
+                event['frame_id'] = frame['id']
+            progress(event)
+
     parent = project / 'training-exports'
     if parent.is_symlink() or parent.resolve().parent != project:
         raise ValueError('Training exports must stay inside the project')
@@ -116,6 +126,8 @@ def export_recordings(project, stores, validation_ids=(), *, background_ratio=0)
             recording_report = dict(id=rid, path=str(store.root), role=role or 'saved', exported=exported,
                                     frames=provenance, background_crops=dict(train=0, val=0), crops=[])
             for frame in frames:
+                report_progress('exporting', completed_frames, total_frames, frame)
+                completed_frames += 1
                 split = role or frame['split']
                 name = f"{rid}-{frame['id']}"
                 text = ''.join(sorted(yolo_text(frame['boxes']).splitlines(keepends=True)))
@@ -171,6 +183,7 @@ def export_recordings(project, stores, validation_ids=(), *, background_ratio=0)
                 if background_ratio and frame['boxes']:
                     crop_sources.append((rid, frame, split, target, recording_report))
             report.append(recording_report)
+        report_progress('exporting', completed_frames, total_frames, frame)
         if not all(counts.values()):
             raise ValueError('The combined dataset needs unique reviewed images in both train and val')
         if background_ratio:
@@ -178,7 +191,9 @@ def export_recordings(project, stores, validation_ids=(), *, background_ratio=0)
             remaining = {split: max(0, math.ceil((counts[split] - negatives[split]) * background_ratio) - negatives[split])
                          for split in ('train', 'val')}
             crop_sources.sort(key=lambda item: (item[2] == 'val', hashlib.sha256(f"{item[0]}/{item[1]['id']}".encode()).digest()))
-            for rid, frame, split, copied_path, recording_report in crop_sources:
+            report_progress('background', 0, len(crop_sources))
+            for completed, (rid, frame, split, copied_path, recording_report) in enumerate(crop_sources):
+                report_progress('background', completed, len(crop_sources), frame)
                 if not remaining[split]:
                     continue
                 with Image.open(copied_path) as copied:
@@ -213,6 +228,7 @@ def export_recordings(project, stores, validation_ids=(), *, background_ratio=0)
                     recording_report['crops'].append(dict(name=name, source_frame_id=frame['id'],
                                                            source_revision=frame['revision'], region=list(region), split=split))
                     break
+            report_progress('background', len(crop_sources), len(crop_sources))
         (destination / 'dataset.yaml').write_text('path: .\ntrain: images/train\nval: images/val\nnames:\n  0: Head\n  1: Body\n', encoding='utf-8', newline='\n')
         result = dict(path=str(destination), **counts, backgrounds=negatives, duplicates_skipped=skipped,
                       background_crops=background_crops, background_ratio=background_ratio,

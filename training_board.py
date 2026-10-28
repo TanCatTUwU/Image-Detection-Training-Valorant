@@ -14,7 +14,7 @@ from pathlib import Path
 from model_registry import ModelRegistry, atomic_json, file_lock, process_alive, read_json, utc_now
 from training_metrics import TrainingMetrics, valid_epoch
 PROJECT = Path(__file__).resolve().parent
-ACTIVE_STATES = {'queued', 'running', 'exporting'}
+ACTIVE_STATES = {'preparing', 'queued', 'running', 'exporting'}
 DEFAULTS = dict(epochs=30, batch=4, imgsz=320, model_width=320, model_height=320,
                 workers=0, threads=2, device='auto', name='train-head-body', auto_activate=True,
                 mosaic=0.3, mixup=0, degrees=0, fliplr=0.5, patience=10, background_ratio=0.25)
@@ -68,7 +68,7 @@ def prepared_environment(project, threads=2):
     return env
 
 def _public_job(job, project=None, metrics=None):
-    keys = ('id', 'state', 'epoch', 'epochs', 'progress', 'message', 'model_id', 'run_path', 'resolved_device')
+    keys = ('id', 'state', 'epoch', 'epochs', 'progress', 'message', 'model_id', 'run_path', 'resolved_device', 'preparation', 'failure_stage', 'source_recording_ids')
     result = {key: job.get(key) for key in keys}
     project = Path(project or job['project'])
     metrics = metrics or TrainingMetrics(project)
@@ -86,7 +86,14 @@ def _public_job(job, project=None, metrics=None):
     return result
 
 def _queued_timeout(job):
-    return job.get('state') == 'queued' and (not job.get('worker_pid')) and ((datetime.now(timezone.utc) - datetime.fromisoformat(job['created_at'])).total_seconds() > 45)
+    return job.get('state') == 'queued' and (not job.get('worker_pid')) and ((datetime.now(timezone.utc) - datetime.fromisoformat(job.get('queued_at') or job['created_at'])).total_seconds() > 45)
+
+def _job_pid(job):
+    return job.get('preparation_pid') if job.get('state') == 'preparing' else job.get('worker_pid') or job.get('launch_pid')
+
+def _append_job_log(job, message):
+    with Path(job['log_path']).open('a', encoding='utf-8') as log:
+        log.write(message.rstrip() + '\n')
 
 class TrainingBoard:
 
@@ -118,15 +125,20 @@ class TrainingBoard:
         if not isinstance(job, dict):
             return None
         if job.get('state') in ACTIVE_STATES:
-            pid = job.get('worker_pid') or job.get('launch_pid')
+            pid = _job_pid(job)
             queued_timeout = _queued_timeout(job)
             if queued_timeout or (pid and (not self.alive(pid))):
                 with file_lock(path.parent / 'status.lock'):
                     job = read_json(path, job)
-                    pid = job.get('worker_pid') or job.get('launch_pid')
+                    pid = _job_pid(job)
                     queued_timeout = _queued_timeout(job)
                     if job.get('state') in ACTIVE_STATES and (queued_timeout or (pid and (not self.alive(pid)))):
-                        job.update(state='failed' if queued_timeout else 'interrupted', message='The PowerShell console did not start its training worker' if queued_timeout else 'Training console or worker closed before completion', updated_at=utc_now())
+                        preparing = job.get('state') == 'preparing'
+                        message = 'The PowerShell console did not start its training worker' if queued_timeout else 'Dataset preparation stopped before completion' if preparing else 'Training console or worker closed before completion'
+                        job.update(state='failed' if queued_timeout else 'interrupted', message=message, updated_at=utc_now())
+                        if preparing:
+                            job['failure_stage'] = 'preparation'
+                        _append_job_log(job, message)
                         atomic_json(path, job)
         return job
 
@@ -160,8 +172,13 @@ class TrainingBoard:
         flags = getattr(subprocess, 'CREATE_NEW_CONSOLE', 0) | getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0)
         return self.launcher(command, cwd=str(self.project), env=env, creationflags=flags)
 
-    def start_training(self, payload, export_callback):
+    def _reserve_training(self, payload, source_recording_ids=()):
         options = validate_options(payload, self.registry)
+        if source_recording_ids:
+            from training_dataset import validate_recording_selection
+            validate_recording_selection(source_recording_ids)
+        elif source_recording_ids not in ((), []):
+            raise ValueError('Training source recording IDs must be a list')
         if not self.python.is_file():
             raise ValueError('The prepared runtime is missing; run setup.bat first')
         self._prepare()
@@ -169,14 +186,6 @@ class TrainingBoard:
             previous = self._latest()
             if previous and previous['state'] in ACTIVE_STATES:
                 raise ValueError('A training job is already running; wait for it to finish')
-            exported = export_callback()
-            if not isinstance(exported, dict) or not isinstance(exported.get('path'), str) or any((type(exported.get(split)) is not int or exported[split] <= 0 for split in ('train', 'val'))):
-                raise ValueError('Reviewed export must contain training and validation images')
-            data = Path(exported['path']).resolve() / 'dataset.yaml'
-            from train_model import audit_dataset
-            report = audit_dataset(data)
-            if any((len(report.images[split]) != exported[split] for split in ('train', 'val'))):
-                raise ValueError('Reviewed export image counts do not match its dataset')
             for _ in range(100):
                 job_id = 'job-' + secrets.token_hex(8)
                 folder = self.root / job_id
@@ -187,21 +196,95 @@ class TrainingBoard:
                     continue
             else:
                 raise ValueError('Could not reserve a unique training job')
-            job = dict(id=job_id, project=str(self.project), options=options, data=str(data), dataset_export=exported, checkpoint=str(self.registry.checkpoint_path(options['checkpoint_id'])), python=str(self.python), state='queued', epoch=0, epochs=options['epochs'], progress=0, message='Starting the prepared PowerShell training console', model_id=None, run_path=None, log_path=str(folder / 'training.log'), created_at=utc_now(), updated_at=utc_now())
+            job = dict(id=job_id, project=str(self.project), options=options, source_recording_ids=list(source_recording_ids), checkpoint=str(self.registry.checkpoint_path(options['checkpoint_id'])), python=str(self.python), state='preparing', preparation_pid=os.getpid(), preparation=dict(stage='exporting', completed=0, total=0), epoch=0, epochs=options['epochs'], progress=0, message='Preparing reviewed training images', model_id=None, run_path=None, log_path=str(folder / 'training.log'), created_at=utc_now(), updated_at=utc_now())
             manifest = folder / 'job.json'
             atomic_json(manifest, job)
             atomic_json(self.root / 'latest.json', {'id': job_id})
-            try:
-                process = self._console(folder / 'start.ps1', '--worker', manifest, threads=options['threads'])
-                with file_lock(folder / 'status.lock'):
-                    job = read_json(manifest, job)
-                    job['launch_pid'] = process.pid
-                    atomic_json(manifest, job)
-            except Exception as exc:
-                job.update(state='failed', message=f'Could not launch training console: {exc}', failure_stage='launch')
+            _append_job_log(job, 'Preparing reviewed training images')
+        return manifest, job
+
+    def _preparation_failed(self, manifest, stage, exc):
+        with file_lock(manifest.parent / 'status.lock'):
+            job = read_json(manifest)
+            if job['state'] not in {'preparing', 'queued'}:
+                return job
+            message = f'Could not launch training console: {exc}' if stage == 'launch' else f'Dataset preparation failed: {exc}'
+            _append_job_log(job, message + '\n' + ''.join(traceback.format_exception(exc)))
+            job.update(state='failed', message=message, failure_stage=stage, updated_at=utc_now())
+            atomic_json(manifest, job)
+            return job
+
+    def _prepare_training(self, manifest, export_callback, *, background=False):
+        job = read_json(manifest)
+        last_write, last_stage = 0, None
+        messages = dict(exporting='Exporting reviewed images', background='Preparing background images', auditing='Checking the exported dataset', launching='Starting the prepared PowerShell training console')
+
+        def progress(event):
+            nonlocal last_write, last_stage
+            stage = event.get('stage')
+            completed, total = event.get('completed'), event.get('total')
+            if stage not in messages or type(completed) is not int or type(total) is not int or not 0 <= completed <= total:
+                raise ValueError('Invalid dataset preparation progress')
+            now = time.monotonic()
+            if stage == last_stage and now - last_write < .5 and completed != total:
+                return
+            preparation = dict(stage=stage, completed=completed, total=total)
+            if isinstance(event.get('frame_id'), str) and re.fullmatch(r'frame-\d{6,}', event['frame_id']):
+                preparation['frame_id'] = event['frame_id']
+            message = messages[stage] + (f' · {completed}/{total}' if total else '')
+            with file_lock(manifest.parent / 'status.lock'):
+                current = read_json(manifest)
+                if current['state'] != 'preparing':
+                    return
+                current.update(preparation=preparation, message=message, updated_at=utc_now())
+                atomic_json(manifest, current)
+            last_write, last_stage = now, stage
+
+        stage = 'export'
+        try:
+            exported = export_callback(progress=progress) if background else export_callback()
+            if not isinstance(exported, dict) or not isinstance(exported.get('path'), str) or any((type(exported.get(split)) is not int or exported[split] <= 0 for split in ('train', 'val'))):
+                raise ValueError('Reviewed export must contain training and validation images')
+            data = Path(exported['path']).resolve() / 'dataset.yaml'
+            stage = 'audit'
+            progress(dict(stage='auditing', completed=0, total=exported['train'] + exported['val']))
+            from train_model import audit_dataset
+            report = audit_dataset(data)
+            if any((len(report.images[split]) != exported[split] for split in ('train', 'val'))):
+                raise ValueError('Reviewed export image counts do not match its dataset')
+            stage = 'launch'
+            progress(dict(stage='launching', completed=0, total=1))
+            with file_lock(manifest.parent / 'status.lock'):
+                job = read_json(manifest)
+                if job['state'] != 'preparing':
+                    return job
+                job.update(data=str(data), dataset_export=exported, state='queued', queued_at=utc_now(), preparation_pid=None, message=messages['launching'], updated_at=utc_now())
                 atomic_json(manifest, job)
+            process = self._console(manifest.parent / 'start.ps1', '--worker', manifest, threads=job['options']['threads'])
+            with file_lock(manifest.parent / 'status.lock'):
+                job = read_json(manifest)
+                job.update(launch_pid=process.pid, preparation=dict(stage='launching', completed=1, total=1), updated_at=utc_now())
+                atomic_json(manifest, job)
+        except Exception as exc:
+            job = self._preparation_failed(manifest, stage, exc)
+            if not background:
                 raise ValueError(job['message']) from exc
+        return job
+
+    def start_training(self, payload, export_callback):
+        manifest, job = self._reserve_training(payload)
+        job = self._prepare_training(manifest, export_callback)
         return _public_job(job, self.project, self.metrics)
+
+    def start_training_async(self, payload, export_callback, *, source_recording_ids=()):
+        manifest, job = self._reserve_training(payload, source_recording_ids)
+        public = _public_job(job, self.project, self.metrics)
+        try:
+            threading.Thread(target=self._prepare_training, args=(manifest, export_callback), kwargs=dict(background=True), name='training-preparation', daemon=True).start()
+        except Exception as exc:
+            self._preparation_failed(manifest, 'preparation', exc)
+            return _public_job(read_json(manifest), self.project, self.metrics)
+        return public
 
     def select_model(self, model_id):
         return self.registry.select(model_id)

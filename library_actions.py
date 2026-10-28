@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 from model_registry import process_alive, read_json
 
-ACTIVE = {'queued', 'running', 'exporting'}
+ACTIVE = {'preparing', 'queued', 'running', 'exporting'}
 
 
 def _inside(value, root):
@@ -36,7 +36,7 @@ class LibraryActions:
         job = read_json(path / 'job.json', {})
         if not isinstance(job, dict) or job.get('state') not in ACTIVE:
             return None
-        pid = job.get('worker_pid') or job.get('launch_pid')
+        pid = job.get('preparation_pid') if job.get('state') == 'preparing' else job.get('worker_pid') or job.get('launch_pid')
         return None if type(pid) is int and not process_alive(pid) else job
 
     def _refresh(self):
@@ -97,6 +97,8 @@ class LibraryActions:
         if preparation and _inside(preparation.get('run_path'), root):
             raise ValueError('This recording is in use by preparation; cancel it first')
         training = self._active('training-jobs')
+        if training and training.get('state') == 'preparing' and recording_id in training.get('source_recording_ids', []):
+            raise ValueError('This recording is in use by training preparation; wait for preparation to finish')
         if training and _inside(training.get('data'), root):
             raise ValueError('This recording export is in use by training; wait for training to stop')
         scan = self._active('empty-scan-jobs', 'active')

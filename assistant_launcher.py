@@ -11,7 +11,7 @@ import sys
 import threading
 import time
 from assistant_api import AssistantUnauthorized, _recording_id
-from assistant_loop import REASONS
+from assistant_loop import ISSUE_REASONS, REASONS
 from model_registry import file_lock
 
 SESSION_ID = re.compile(r'session-[a-f0-9]{24}\Z')
@@ -73,6 +73,15 @@ def write_json(path, value):
         os.replace(temporary, path)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def safe_issue(value):
+    if not isinstance(value, dict) or set(value) != {'reason', 'at', 'retry_attempts'}:
+        return None
+    reason, at, attempts = value['reason'], value['at'], value['retry_attempts']
+    if not isinstance(reason, str) or reason not in ISSUE_REASONS or type(at) not in (int, float) or not math.isfinite(at) or at < 0 or type(attempts) is not int or not 0 <= attempts <= 5:
+        return None
+    return dict(reason=reason, at=at, retry_attempts=attempts)
 
 
 class AssistantLauncher:
@@ -224,6 +233,9 @@ class AssistantLauncher:
         attempts = entry.get('retry_attempts', 0)
         worker_attempts = entry.get('launch_attempts', 0)
         result.update(message=message, authorized=valid, resumable=bool(valid and not entry['active']), reason=reason, retry_attempts=attempts if type(attempts) is int and 0 <= attempts <= 5 else 0, retry_limit=5, worker_attempts=max(worker_attempts - 1, 0) if type(worker_attempts) is int and 0 <= worker_attempts <= 6 else 0, worker_retry_limit=5, last_progress_at=entry.get('healthy_progress_at'))
+        issue = safe_issue(self._worker_status(entry).get('last_issue'))
+        if issue:
+            result['last_issue'] = dict(issue, message=REASONS.get(issue['reason'], MESSAGES.get(issue['reason'])))
         return result
 
     def _control(self, entry, valid):

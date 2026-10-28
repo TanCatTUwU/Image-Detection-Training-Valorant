@@ -889,7 +889,8 @@ function renderAssistantLauncher() {
   button.setAttribute("aria-busy",String(assistantAction));
   const error=!!session && ["error","failed","blocked","auth_required","quota_exhausted","server_unavailable","access_unavailable","provider_unavailable","invalid_output","expired"].includes(session.phase);
   const phases={starting:"Starting Antigravity…",running:"Reviewing pending frames.",paused:"Paused. Progress is saved.",restarting:"Restarting the worker in this session…",stopped:"Session stopped. Resume to continue.",disconnected:"Assistant disconnected.",expired:"Access expired. Start Antigravity to reconnect."};
-  status.textContent=assistantAction?(active?"Pausing Antigravity…":"Starting Antigravity…"):session?(typeof session.message==="string" && session.message?session.message:phases[session.phase] || "Check Command Prompt for session details."):!assistantsAvailable?"Assistant connections unavailable.":typeof assistantLoaded!=="undefined" && !assistantLoaded?"Loading Antigravity…":!launcher?.available?"Automatic launch unavailable. Use a manual connection.":"Ready to review this recording.";
+  status.textContent=assistantAction?(active?"Pausing Antigravity…":"Starting Antigravity…"):session?(typeof session.message==="string" && session.message?session.message:phases[session.phase] || "Session stopped. Resume to continue."):!assistantsAvailable?"Assistant connections unavailable.":typeof assistantLoaded!=="undefined" && !assistantLoaded?"Loading Antigravity…":!launcher?.available?"Automatic launch unavailable. Use a manual connection.":"Ready to review this recording.";
+  status.title=typeof session?.last_issue?.message==="string"?`Last issue: ${session.last_issue.message}`:"";
   status.hidden=!session && !assistantAction && !!launcher?.available && assistantsAvailable && (typeof assistantLoaded==="undefined" || assistantLoaded);
   status.classList.toggle("error",error && !assistantAction);
 }
@@ -1256,7 +1257,7 @@ async function browseVideo() {
   finally { recordingAction=false; updateRecordingControls(); }
 }
 function workbenchError(message="") { $("workbenchError").textContent=message; $("workbenchError").hidden=!message; }
-function trainingActive() { return ["queued","running","exporting"].includes(workbench?.training?.state); }
+function trainingActive() { return ["preparing","queued","running","exporting"].includes(workbench?.training?.state); }
 function trainingFrameCount(item) { return Number.isFinite(item?.reviewed)?item.reviewed:(Number.isFinite(item?.approved)?item.approved:0)+(Number.isFinite(item?.rejected)?item.rejected:0); }
 function trainingRecordingAvailable(item) { return item?.status==="complete" && trainingFrameCount(item)>0; }
 function selectedTrainingRecordings() { return [...trainingRecordingIds].map(id=>(recordingLibrary?.recordings||[]).find(item=>item.id===id)); }
@@ -1417,6 +1418,17 @@ function updateWorkbenchControls() {
   updateRecordingControls();
   updateEmptyScanControls();
 }
+function trainingJobView(job) {
+  const preparing=job.state==="preparing", preparation=job.preparation || {};
+  if(preparing) {
+    const titles={exporting:"Preparing training data",background:"Preparing background samples",auditing:"Checking training data",launching:"Starting PowerShell"};
+    const total=Number(preparation.total), completed=Math.max(0,Number(preparation.completed)||0), counted=Number.isFinite(total) && total>0;
+    return {title:`${titles[preparation.stage] || "Preparing training data"}${counted?` · ${Math.min(completed,total).toLocaleString()} / ${total.toLocaleString()} frames`:""}`,message:job.message || "Preparing reviewed frames before launching PowerShell.",progress:counted?Math.min(100,completed/total*100):0,metrics:false};
+  }
+  const epoch=Number.isFinite(job.epoch)&&Number.isFinite(job.epochs)?` · epoch ${job.epoch} / ${job.epochs}`:"";
+  const device=job.resolved_device==="cpu"?" · CPU":/^\d+$/.test(String(job.resolved_device??""))?` · CUDA ${job.resolved_device}`:"";
+  return {title:job.state==="queued"?"Starting PowerShell":`Training ${job.state}${epoch}${device}`,message:job.message || (job.state==="completed"?"Model export completed.":"Waiting for training progress…"),progress:Math.min(100,Math.max(0,Number(job.progress)||0)),metrics:job.state!=="queued"};
+}
 function setupTrainingForm(options) {
   const defaults={epochs:30,batch:4,model_width:320,model_height:320,workers:0,threads:2,device:"auto",name:"train-head-body",auto_activate:true,mosaic:.3,mixup:0,degrees:0,fliplr:.5,patience:10,background_ratio:.25,...options.defaults};
   if(!trainingFormReady) {
@@ -1459,17 +1471,17 @@ function renderWorkbench() {
   $("trainingDownloads").hidden=job?.state!=="completed";
   if(job) {
     $("trainingStatus").classList.toggle("failed",["failed","interrupted"].includes(job.state));
-    const epoch=Number.isFinite(job.epoch)&&Number.isFinite(job.epochs)?` · epoch ${job.epoch} / ${job.epochs}`:"";
-    const device=job.resolved_device==="cpu"?" · CPU":/^\d+$/.test(String(job.resolved_device??""))?` · CUDA ${job.resolved_device}`:"";
-    $("jobTitle").textContent=`Training ${job.state}${epoch}${device}`;
-    $("jobMessage").textContent=job.message || (job.state==="completed"?"Model export completed.":"Waiting for training progress…");
-    const progress=Math.min(100,Math.max(0,Number(job.progress)||0)); $("jobProgress").style.width=`${progress}%`;
+    const view=trainingJobView(job);
+    $("jobTitle").textContent=view.title;
+    $("jobMessage").textContent=view.message;
+    $("jobProgress").style.width=`${view.progress}%`;
+    $("trainingMetrics").hidden=!view.metrics;
     const terminal=["completed","failed","interrupted"].includes(job.state);
     $("trainingLogDetails").hidden=!terminal;
     if(!terminal) $("trainingLogDetails").open=false;
     $("jobPath").textContent=terminal?(job.run_path || ""):"";
     $("jobLog").textContent=terminal?(Array.isArray(job.log_tail)?job.log_tail.join("\n"):String(job.log_tail||"No log output available.")):"";
-    renderTrainingMetrics(job);
+    if(view.metrics) renderTrainingMetrics(job);
   }
   renderModelImportStatus(); setupTrainingForm(workbench.options||{}); updateWorkbenchControls();
 }
@@ -1856,10 +1868,10 @@ $("trainingForm").onsubmit=async event=>{
   for(const key of ["epochs","batch","model_width","model_height","workers","threads","mosaic","mixup","degrees","fliplr","patience","background_ratio"]) payload[key]=Number(payload[key]);
   payload.recording_ids=[...trainingRecordingIds]; payload.validation_recording_ids=[...validationRecordingIds];
   payload.auto_activate=$("trainAutoActivate").checked;
-  $("trainingError").textContent=""; workbenchAction=true; workbenchGeneration++; workbenchError(); updateWorkbenchControls();
-  try { const job=await api("/api/training/start",payload); workbench.training=job; renderWorkbench(); $("trainingDialog").close(); notice("Training started in PowerShell."); }
+  $("trainingError").textContent=""; workbenchAction=true; workbenchGeneration++; workbenchError(); $("startTraining").textContent="Preparing…"; $("startTraining").setAttribute("aria-busy","true"); updateWorkbenchControls();
+  try { const job=await api("/api/training/start",payload); workbench.training=job; renderWorkbench(); $("trainingDialog").close(); setWorkbenchOpen(true); setTrainingDataExpanded(true); notice(job.state==="preparing"?"Preparing training data…":"Training started in PowerShell."); }
   catch(error) { $("trainingError").textContent=error.message; }
-  finally { workbenchAction=false; updateWorkbenchControls(); }
+  finally { workbenchAction=false; $("startTraining").textContent="Start in PowerShell"; $("startTraining").setAttribute("aria-busy","false"); updateWorkbenchControls(); }
 };
 $("suggestBoxes").onclick=suggestBoxes; $("applyProposals").onclick=applyProposals;
 $("proposalAssist").onchange=()=>{ clearProposals(); updateWorkbenchControls(); draw(); };

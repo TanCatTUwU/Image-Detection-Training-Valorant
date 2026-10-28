@@ -713,6 +713,12 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                     recording_stores[root] = ReviewStore(root)
                 return recording_stores[root]
 
+        def _start_training(self, board, options, export_callback, source_recording_ids):
+            start = getattr(board, 'start_training_async', board.start_training)
+            if callable(getattr(board, 'start_training_async', None)):
+                return start(options, export_callback, source_recording_ids=source_recording_ids)
+            return start(options, export_callback)
+
         def _training(self, payload):
             options = dict(payload)
             if 'recording_ids' not in options:
@@ -723,8 +729,11 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                     from recording_library import recording_id
                     current = self._store()
                     board = get_workbench()
-                    return board.start_training(options, lambda: export_recordings(getattr(board, 'project', PROJECT), [(recording_id(current.root), current)], background_ratio=options['background_ratio']))
-                return get_workbench().start_training(options, self._store().export_reviewed)
+                    return self._start_training(board, options, lambda progress=None: export_recordings(getattr(board, 'project', PROJECT), [(recording_id(current.root), current)], background_ratio=options['background_ratio'], progress=progress), [recording_id(current.root)])
+                board = get_workbench()
+                current = self._store()
+                from recording_library import recording_id
+                return self._start_training(board, options, lambda progress=None: current.export_reviewed(), [recording_id(current.root)])
             from training_dataset import export_recordings, validate_recording_selection
             selected = options.pop('recording_ids')
             validation = options.pop('validation_recording_ids', [])
@@ -738,7 +747,7 @@ def make_server(store, port=8765, token=None, *, workbench=None, proposals=None,
                         recording_stores[root] = ReviewStore(root)
                     sources.append((rid, recording_stores[root]))
             board = get_workbench()
-            return board.start_training(options, lambda: export_recordings(getattr(board, 'project', PROJECT), sources, validation, background_ratio=options.get('background_ratio', 0.25)))
+            return self._start_training(board, options, lambda progress=None: export_recordings(getattr(board, 'project', PROJECT), sources, validation, background_ratio=options.get('background_ratio', 0.25), progress=progress), selected)
 
         def do_GET(self):
             try:
