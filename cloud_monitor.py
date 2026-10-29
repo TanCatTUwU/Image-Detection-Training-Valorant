@@ -1,12 +1,14 @@
 from __future__ import annotations
 import argparse
 import ctypes
+import csv
 from contextlib import contextmanager
 import hashlib
 import hmac
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import ipaddress
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -19,6 +21,164 @@ import time
 from urllib.parse import parse_qs, urlsplit
 from urllib.request import Request, urlopen
 from training_metrics import read_metrics
+
+
+class ResourceMonitor:
+    def __init__(self, proc=Path('/proc'), cgroup=Path('/sys/fs/cgroup')):
+        self.proc, self.cgroup = Path(proc), Path(cgroup)
+        self.lock = threading.Lock()
+        self.updated = -math.inf
+        self.previous = None
+        self.value = {'cpu': {}, 'ram': {}, 'gpus': [], 'gpu_status': 'Sampling'}
+
+    def read(self, path):
+        try:
+            return path.read_text(encoding='utf-8')[:65536].strip()
+        except OSError:
+            return ''
+
+    def numeric(self, value):
+        try:
+            number = float(value)
+            return number if math.isfinite(number) and number >= 0 else None
+        except (ValueError, TypeError):
+            return None
+
+    def group(self, controller, filename):
+        for line in self.read(self.proc / 'self/cgroup').splitlines():
+            fields = line.split(':', 2)
+            if len(fields) != 3 or controller and controller not in fields[1].split(',') or not controller and fields[1]:
+                continue
+            relative = Path(fields[2].lstrip('/'))
+            if '..' in relative.parts or relative.is_absolute():
+                continue
+            bases = [self.cgroup] if not controller else [self.cgroup / fields[1], self.cgroup / controller]
+            for base in bases:
+                for path in (base / relative, base):
+                    if (path / filename).is_file():
+                        return path, base
+        if (self.cgroup / filename).is_file():
+            return self.cgroup, self.cgroup
+        return None, None
+
+    def system(self, now):
+        cpu = {'percent': None, 'scope': 'unavailable', 'cores': None}
+        ram = {'percent': None, 'used_bytes': None, 'total_bytes': None, 'scope': 'unavailable'}
+        memory = {}
+        for line in self.read(self.proc / 'meminfo').splitlines():
+            parts = line.split()
+            if len(parts) >= 2:
+                memory[parts[0].rstrip(':')] = (self.numeric(parts[1]) or 0) * 1024
+        host_total = memory.get('MemTotal')
+        if host_total and 'MemAvailable' in memory:
+            ram.update(used_bytes=max(0, host_total - memory['MemAvailable']), total_bytes=host_total, scope='host')
+        group, base = self.group('', 'memory.current')
+        version = 2
+        if group is None:
+            group, base = self.group('memory', 'memory.usage_in_bytes')
+            version = 1
+        if group is not None:
+            used = self.numeric(self.read(group / ('memory.current' if version == 2 else 'memory.usage_in_bytes')))
+            limits = [host_total] if host_total else []
+            path = group
+            bounded = False
+            while True:
+                limit = self.numeric(self.read(path / ('memory.max' if version == 2 else 'memory.limit_in_bytes')))
+                if limit and (not host_total or limit < host_total):
+                    limits.append(limit)
+                    bounded = True
+                if path == base:
+                    break
+                path = path.parent
+            if used is not None:
+                ram.update(used_bytes=used, total_bytes=min(limits) if limits else None, scope='container', limited=bounded)
+        try:
+            cores = len(os.sched_getaffinity(0))
+        except (AttributeError, OSError):
+            cores = os.cpu_count() or 1
+        group, base = self.group('', 'cpu.stat')
+        version = 2
+        if group is None:
+            group, base = self.group('cpuacct', 'cpuacct.usage')
+            version = 1
+        sample = None
+        if group is not None:
+            quota_group, quota_base = (group, base) if version == 2 else self.group('cpu', 'cpu.cfs_quota_us')
+            path = quota_group
+            while path is not None:
+                values = self.read(path / 'cpu.max').split() if version == 2 else [self.read(path / 'cpu.cfs_quota_us'), self.read(path / 'cpu.cfs_period_us')]
+                if len(values) == 2:
+                    quota, period = map(self.numeric, values)
+                    if quota and period:
+                        cores = min(cores, quota / period)
+                if path == quota_base:
+                    break
+                path = path.parent
+            usage = dict(line.split()[:2] for line in self.read(group / 'cpu.stat').splitlines() if len(line.split()) >= 2) if version == 2 else {}
+            counter = self.numeric(usage.get('usage_usec') if version == 2 else self.read(group / 'cpuacct.usage'))
+            if counter is not None:
+                sample = ('container', counter / (1e6 if version == 2 else 1e9), now, cores)
+        if sample is None:
+            fields = self.read(self.proc / 'stat').splitlines()
+            values = [self.numeric(item) for item in fields[0].split()[1:9]] if fields and fields[0].startswith('cpu ') else []
+            if len(values) >= 4 and all(item is not None for item in values):
+                total = sum(values)
+                idle = values[3] + (values[4] if len(values) > 4 else 0)
+                sample = ('host', total - idle, total, cores)
+        if self.proc == Path('/proc') and sys.platform == 'win32':
+            class MemoryStatus(ctypes.Structure):
+                _fields_ = [('length', ctypes.c_ulong), ('load', ctypes.c_ulong)] + [(name, ctypes.c_ulonglong) for name in ('total', 'available', 'page_total', 'page_available', 'virtual_total', 'virtual_available', 'extended')]
+            status = MemoryStatus()
+            status.length = ctypes.sizeof(status)
+            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+                ram.update(used_bytes=status.total - status.available, total_bytes=status.total, scope='host')
+            idle, kernel, user = ctypes.c_ulonglong(), ctypes.c_ulonglong(), ctypes.c_ulonglong()
+            if ctypes.windll.kernel32.GetSystemTimes(ctypes.byref(idle), ctypes.byref(kernel), ctypes.byref(user)):
+                sample = ('host', kernel.value + user.value - idle.value, kernel.value + user.value, cores)
+        if sample:
+            scope, busy, elapsed, cores = sample
+            cpu.update(scope=scope, cores=cores)
+            if self.previous and self.previous[0] == scope:
+                delta, duration = busy - self.previous[1], elapsed - self.previous[2]
+                if duration > 0 and delta >= 0:
+                    cpu['percent'] = min(100, 100 * delta / duration / (cores if scope == 'container' else 1))
+            self.previous = sample
+        if ram['used_bytes'] is not None and ram['total_bytes']:
+            ram['percent'] = min(100, 100 * ram['used_bytes'] / ram['total_bytes'])
+        return cpu, ram
+
+    def gpu(self):
+        try:
+            options = {'creationflags': subprocess.CREATE_NO_WINDOW} if sys.platform == 'win32' else {}
+            result = subprocess.run(['nvidia-smi', '--query-gpu=index,uuid,name,utilization.gpu,memory.used,memory.total', '--format=csv,noheader,nounits'], capture_output=True, text=True, timeout=2, check=True, **options)
+            gpus = []
+            for row in csv.reader(result.stdout.splitlines(), skipinitialspace=True):
+                if len(row) != 6:
+                    continue
+                index, identity, name, percent, used, total = [item.strip() for item in row]
+                percent, used, total = map(self.numeric, (percent, used, total))
+                gpus.append({'index': index, 'uuid': identity, 'name': name[:120], 'percent': min(100, percent) if percent is not None else None, 'used_bytes': used * 1024**2 if used is not None else None, 'total_bytes': total * 1024**2 if total else None})
+            for key in ('NVIDIA_VISIBLE_DEVICES', 'CUDA_VISIBLE_DEVICES'):
+                selection = os.environ.get(key)
+                if selection is not None and selection.strip().lower() != 'all':
+                    available = gpus
+                    gpus = [gpu for position, gpu in enumerate(available) if any(item.strip() == (str(position) if key == 'CUDA_VISIBLE_DEVICES' else gpu['index']) or item.strip().startswith('GPU-') and gpu['uuid'].startswith(item.strip()) for item in selection.split(','))]
+            return gpus, '' if gpus else 'No visible NVIDIA GPU'
+        except (OSError, subprocess.SubprocessError, UnicodeError):
+            return [], 'NVIDIA metrics unavailable'
+
+    def get(self):
+        now = time.monotonic()
+        if now - self.updated < 5 or not self.lock.acquire(blocking=False):
+            return self.value
+        try:
+            cpu, ram = self.system(now)
+            gpus, status = self.gpu()
+            self.value = {'cpu': cpu, 'ram': ram, 'gpus': gpus, 'gpu_status': status, 'sampled_at': time.time()}
+            self.updated = now
+            return self.value
+        finally:
+            self.lock.release()
 
 
 def mapped_ports(environ):
@@ -158,6 +318,7 @@ def make_server(root, *, token=None, port=0, host='127.0.0.1'):
     token = token or secrets.token_urlsafe(32)
     identity = monitor_id(root, token)
     html = Path(__file__).with_suffix('.html').read_bytes()
+    resources = ResourceMonitor()
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
             pass
@@ -177,6 +338,7 @@ def make_server(root, *, token=None, port=0, host='127.0.0.1'):
             if parsed.path == '/api/status':
                 value = snapshot(root, logs=query.get('logs') == ['1'])
                 value['monitor_id'] = identity
+                value['resources'] = resources.get()
                 return self.send_body(200, json.dumps(value, allow_nan=False).encode(), 'application/json')
             self.send_body(404, b'Not found', 'text/plain')
 
