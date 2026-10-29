@@ -497,7 +497,7 @@ def main(argv=None):
             from ultralytics.engine import trainer
             yolo_settings.update({key: False for key in ('sync', 'clearml', 'comet', 'dvc', 'mlflow', 'raytune', 'tensorboard', 'wandb')})
             utils.check_font = lambda *a, **kw: None
-            dataset.save_dataset_cache_file = lambda *a, **kw: None
+            dataset.save_dataset_cache_file = lambda prefix, path, values, version: values.update(version=version)
             trainer.check_amp = lambda model: check_local_amp(model, torch)
             execute(root, settings, fingerprint, runtime_versions(torch), YOLO, args.resume, args.export_only)
         return 0
@@ -508,6 +508,7 @@ def main(argv=None):
                 status(root, 'failed', training_complete=previous.get('training_complete', False), error=str(exc))
             record_failure(root, exc, 'bootstrap' if args.bootstrap else 'worker' if args.worker else 'preflight')
         print(f'Cloud runner failed: {exc}', file=sys.stderr, flush=True)
+        print(redact(root, ''.join(traceback.format_exception(type(exc), exc, exc.__traceback__))), file=sys.stderr, flush=True)
         return 2
     finally:
         if descriptor is not None:
