@@ -415,7 +415,7 @@ def bootstrap(root, settings, descriptor, resume, export_only):
     import torch
     check_cuda(torch)
     before = str(torch.__version__)
-    constraints = [f'torch=={before}']
+    constraints = [f'torch=={importlib.metadata.version("torch")}']
     try:
         constraints.append('torchvision==' + importlib.metadata.version('torchvision'))
     except importlib.metadata.PackageNotFoundError:
