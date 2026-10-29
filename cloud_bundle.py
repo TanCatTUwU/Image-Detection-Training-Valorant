@@ -237,7 +237,7 @@ class BundleManager:
             if _signature(checkpoint) != signature:
                 raise ValueError('The selected checkpoint changed during validation')
             files['checkpoint.pt'] = (checkpoint, signature)
-            for source, target in (('cloud_runner.py', 'train.py'), ('cloud_run.sh', 'run.sh')):
+            for source, target in (('cloud_runner.py', 'train.py'), ('cloud_run.sh', 'run.sh'), ('cloud_monitor.py', 'monitor.py'), ('cloud_monitor.html', 'monitor.html'), ('training_metrics.py', 'training_metrics.py')):
                 path = SOURCE / source
                 if not path.is_file() or path.is_symlink():
                     raise ValueError('The portable training runner is missing; update the application')

@@ -25,6 +25,37 @@ def valid_epoch(value):
     number = finite_number(value)
     return int(number) if not isinstance(value, bool) and number is not None and number.is_integer() and 1 <= number <= 1000 else None
 
+def read_metrics(path):
+    with path.open('rb') as stream:
+        raw = stream.read(4 * 1024 * 1024 + 1)
+    raw = raw[:4 * 1024 * 1024]
+    end = raw.rfind(b'\n')
+    if end < 0:
+        return [], None
+    reader = csv.DictReader(io.StringIO(raw[:end + 1].decode('utf-8-sig', errors='replace')))
+    if not reader.fieldnames:
+        return [], None
+    reader.fieldnames = [name.strip() for name in reader.fieldnames]
+    rows = {}
+    fitness = {}
+    try:
+        for values in reader:
+            epoch = valid_epoch(values.get('epoch'))
+            if epoch is None:
+                continue
+            row = {'epoch': epoch}
+            for field, aliases in FIELDS.items():
+                row[field] = next((finite_number(values[name]) for name in aliases if name in values), None)
+            rows[epoch] = row
+            score = next((finite_number(values[name]) for name in ('metrics/mAP50-95(B)', 'metrics/mAP50-95') if name in values), row['map50'])
+            if score is not None:
+                fitness[epoch] = score
+    except csv.Error:
+        pass
+    history = [rows[epoch] for epoch in sorted(rows)]
+    best = max(fitness, key=fitness.get) if fitness else None
+    return history, best
+
 class TrainingMetrics:
 
     def __init__(self, project):
@@ -49,35 +80,7 @@ class TrainingMetrics:
             return None
 
     def _read(self, path):
-        with path.open('rb') as stream:
-            raw = stream.read(4 * 1024 * 1024 + 1)
-        raw = raw[:4 * 1024 * 1024]
-        end = raw.rfind(b'\n')
-        if end < 0:
-            return [], None
-        reader = csv.DictReader(io.StringIO(raw[:end + 1].decode('utf-8-sig', errors='replace')))
-        if not reader.fieldnames:
-            return [], None
-        reader.fieldnames = [name.strip() for name in reader.fieldnames]
-        rows = {}
-        fitness = {}
-        try:
-            for values in reader:
-                epoch = valid_epoch(values.get('epoch'))
-                if epoch is None:
-                    continue
-                row = {'epoch': epoch}
-                for field, aliases in FIELDS.items():
-                    row[field] = next((finite_number(values[name]) for name in aliases if name in values), None)
-                rows[epoch] = row
-                score = next((finite_number(values[name]) for name in ('metrics/mAP50-95(B)', 'metrics/mAP50-95') if name in values), row['map50'])
-                if score is not None:
-                    fitness[epoch] = score
-        except csv.Error:
-            pass
-        history = [rows[epoch] for epoch in sorted(rows)]
-        best = max(fitness, key=fitness.get) if fitness else None
-        return history, best
+        return read_metrics(path)
 
     def snapshot(self, run_path, *, stopped_early=False, best_epoch=None):
         history, best = [], None

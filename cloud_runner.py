@@ -147,7 +147,7 @@ def archive_name(name):
     parts = name.split('/')
     if any(part in ('', '.', '..') or part.endswith((' ', '.')) or part.split('.')[0].lower() in RESERVED or any(ord(c) < 32 or c in '<>"|?*' for c in part) for part in parts):
         return False
-    if name in REQUIRED:
+    if name in REQUIRED | {'monitor.py', 'monitor.html', 'training_metrics.py'}:
         return True
     return len(parts) == 4 and parts[:2] in (['dataset', 'images'], ['dataset', 'labels']) and parts[2] in ('train', 'val') and Path(parts[3]).suffix.lower() in ({'.png', '.jpg', '.jpeg', '.webp', '.bmp'} if parts[1] == 'images' else {'.txt'})
 
@@ -434,12 +434,25 @@ def bootstrap(root, settings, descriptor, resume, export_only):
     os.execv(str(python), arguments)
 
 
+def start_dashboard(root):
+    monitor = root / 'monitor.py'
+    if not monitor.is_file():
+        return
+    try:
+        result = subprocess.run([sys.executable, '-B', str(monitor), '--root', str(root), '--background'], capture_output=True, text=True, timeout=12, check=True)
+        print(result.stdout, end='', flush=True)
+    except Exception as exc:
+        telemetry(root, 'dashboard_unavailable', error_type=type(exc).__name__)
+        print('Dashboard unavailable; see outputs/monitor.log. Training will continue.', flush=True)
+
+
 def launch(root, settings, descriptor, resume, export_only):
     previous = read_json(root / 'outputs/status.json') if (root / 'outputs/status.json').exists() else {}
     if previous.get('state') == 'completed':
         raise ValueError('This run is completed; extract a fresh bundle for another run')
     if (root / 'outputs/run.json').exists() and not resume and not export_only:
         raise ValueError('Existing run requires explicit --resume')
+    start_dashboard(root)
     import torch
     check_cuda(torch)
     arguments = [sys.executable, '-u', str(root / 'train.py'), '--bootstrap', '--lock-fd', str(descriptor)]
